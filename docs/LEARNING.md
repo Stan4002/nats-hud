@@ -14,3 +14,9 @@
 - Small reusable St components give cards, metric values, progress indicators, sparklines, and section headings a consistent structure while keeping their presentation in `stylesheet.css`.
 - Update existing actors when telemetry refreshes instead of recreating them. This preserves layout and actor state, avoids repeated allocation and destruction, and keeps refresh work lightweight.
 - Keep UI components separate from telemetry: widgets display values they receive, while telemetry alone is responsible for collecting system data.
+
+# Process Launching
+
+- `Gio.Subprocess` launches a child process without blocking the Shell, and its asynchronous wait API can report unsuccessful exits.
+- Pass a validated argv array directly to the process API. Each argument remains a distinct value, so spaces or shell metacharacters are not interpreted as command syntax as they would be in a constructed shell string.
+- Keep application launching outside UI components. Widgets can request an action while the launcher owns process creation, validation, and error reporting.

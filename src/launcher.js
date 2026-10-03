@@ -1,0 +1,82 @@
+import Gio from 'gi://Gio';
+
+function reportError(message, error) {
+	logError(error, `NATS HUD: ${message}`);
+}
+
+function isStringArray(value) {
+	return Array.isArray(value) && [...value].every(argument => typeof argument === 'string');
+}
+
+export function launchCommand(argv) {
+	if (!isStringArray(argv) || argv.length === 0 || argv[0].length === 0) {
+		reportError('Cannot launch command: argv must be a non-empty array of strings',
+			new TypeError('Invalid argv'));
+		return null;
+	}
+
+	const command = [...argv];
+
+	try {
+		const process = Gio.Subprocess.new(command, Gio.SubprocessFlags.NONE);
+
+		process.wait_check_async(null, (subprocess, result) => {
+			try {
+				subprocess.wait_check_finish(result);
+			} catch (error) {
+				reportError(`Command failed: ${command[0]}`, error);
+			}
+		});
+
+		return process;
+	} catch (error) {
+		reportError(`Unable to launch command: ${command[0]}`, error);
+		return null;
+	}
+}
+
+export function launchApplication(executable, args = []) {
+	if (typeof executable !== 'string' || executable.length === 0 || !isStringArray(args)) {
+		reportError('Cannot launch application: executable and args must be strings',
+			new TypeError('Invalid application arguments'));
+		return null;
+	}
+
+	return launchCommand([executable, ...args]);
+}
+
+export function launchTerminal(commandArgs = []) {
+	if (!isStringArray(commandArgs)) {
+		reportError('Cannot launch terminal: commandArgs must be an array of strings',
+			new TypeError('Invalid terminal arguments'));
+		return null;
+	}
+
+	const terminalArgs = commandArgs.length > 0
+		? ['--', ...commandArgs]
+		: [];
+
+	return launchApplication('gnome-terminal', terminalArgs);
+}
+
+export function openBtop() {
+	return launchTerminal(['btop']);
+}
+
+export function openSystemMonitor() {
+	return launchApplication('gnome-system-monitor');
+}
+
+export function openFiles() {
+	return launchApplication('nautilus');
+}
+
+export function openTerminal() {
+	return launchTerminal();
+}
+
+export function openCode(projectPath = null) {
+	const args = projectPath === null ? [] : [projectPath];
+
+	return launchApplication('code', args);
+}
