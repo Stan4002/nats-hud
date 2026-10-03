@@ -140,6 +140,47 @@
     font-size: 14px;
 }
 
+.nats-core-grid {
+    spacing: 10px;
+}
+
+.nats-core-column {
+    spacing: 5px;
+}
+
+.nats-core-metric {
+    spacing: 3px;
+}
+
+.nats-core-metric .nats-progress-label,
+.nats-core-metric .nats-progress-value {
+    font-size: 8px;
+}
+
+.nats-core-metric .nats-progress-track,
+.nats-core-metric .nats-progress-fill {
+    height: 3px;
+    border-radius: 2px;
+}
+
+.nats-system-values {
+    spacing: 12px;
+    padding-bottom: 2px;
+}
+
+.nats-system-metric {
+    spacing: 2px;
+}
+
+.nats-system-metric .nats-metric-main {
+    color: #dce5e9;
+    font-size: 12px;
+}
+
+.nats-system-metric .nats-metric-label {
+    font-size: 8px;
+}
+
 .nats-section-header {
     color: #9eabb4;
     font-family: "FiraCode Nerd Font";

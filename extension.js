@@ -6,7 +6,13 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {SystemTelemetry} from './src/telemetry.js';
-import {formatBytes, formatPercent} from './src/formatters.js';
+import {
+    formatBytes,
+    formatDuration,
+    formatLoad,
+    formatPercent,
+    formatTemperature
+} from './src/formatters.js';
 import {
     GlassCard,
     MetricValue,
@@ -30,8 +36,9 @@ export default class NatsHudExtension extends Extension {
 
         this._telemetry = new SystemTelemetry();
         this._cpuHistory = [];
-        this._buildHud();
-        this._updateMetrics();
+        const initialSnapshot = this._telemetry.readSnapshot();
+        this._buildHud(initialSnapshot.cpu.cores);
+        this._updateMetrics(initialSnapshot);
 
         this._timer = GLib.timeout_add_seconds(
             GLib.PRIORITY_DEFAULT,
@@ -43,7 +50,7 @@ export default class NatsHudExtension extends Extension {
         );
     }
 
-    _buildHud() {
+    _buildHud(initialCores) {
         this._hud = new St.BoxLayout({
             vertical: true,
             style_class: 'nats-hud'
@@ -73,6 +80,24 @@ export default class NatsHudExtension extends Extension {
         this._cpuCard.body.add_child(this._cpuValue);
         this._cpuCard.body.add_child(this._cpuProgress);
         this._cpuCard.body.add_child(this._cpuSparkline);
+
+        this._coreMetrics = new Map();
+        this._coreColumns = [];
+        this._coreGrid = new St.BoxLayout({
+            style_class: 'nats-core-grid',
+            x_expand: true
+        });
+        for (let columnIndex = 0; columnIndex < 2; columnIndex++) {
+            const column = new St.BoxLayout({
+                vertical: true,
+                style_class: 'nats-core-column',
+                x_expand: true
+            });
+            this._coreColumns.push(column);
+            this._coreGrid.add_child(column);
+        }
+        this._ensureCoreMetrics(initialCores);
+        this._cpuCard.body.add_child(this._coreGrid);
         this._connectCardAction(this._cpuCard, openBtop);
         metricsRow.add_child(this._cpuCard);
 
@@ -103,6 +128,23 @@ export default class NatsHudExtension extends Extension {
             iconText: '⌘',
             reactive: false
         });
+        const systemValues = new St.BoxLayout({
+            style_class: 'nats-system-values',
+            x_expand: true
+        });
+        this._systemMetrics = {
+            uptime: new MetricValue({label: 'UPTIME'}),
+            loadOne: new MetricValue({label: 'LOAD 1M'}),
+            loadFive: new MetricValue({label: 'LOAD 5M'}),
+            loadFifteen: new MetricValue({label: 'LOAD 15M'})
+        };
+        for (const metric of Object.values(this._systemMetrics)) {
+            metric.add_style_class_name('nats-system-metric');
+            metric.x_expand = true;
+            systemValues.add_child(metric);
+        }
+        actionsCard.body.add_child(systemValues);
+
         const actionsRow = new St.BoxLayout({
             style_class: 'nats-actions-row',
             x_expand: true
@@ -115,7 +157,7 @@ export default class NatsHudExtension extends Extension {
         this._hud.add_child(actionsCard);
 
         Main.layoutManager._backgroundGroup.add_child(this._hud);
-        this._hud.set_position(32, 48);
+        this._hud.set_position(32, Main.panel.height + 12);
     }
 
     _connectCardAction(card, action) {
@@ -148,13 +190,44 @@ export default class NatsHudExtension extends Extension {
         return button;
     }
 
-    _updateMetrics() {
+    _ensureCoreMetrics(cores) {
+        const activeCoreIds = new Set();
+
+        for (const [index, core] of cores.entries()) {
+            activeCoreIds.add(core.id);
+
+            let metric = this._coreMetrics.get(core.id);
+            if (!metric) {
+                metric = new ProgressMetric({
+                    label: `C${core.id.replace(/^cpu/, '')}`,
+                    percent: 0,
+                    text: '--'
+                });
+                metric.add_style_class_name('nats-core-metric');
+                metric.x_expand = true;
+                this._coreColumns[index % this._coreColumns.length].add_child(metric);
+                this._coreMetrics.set(core.id, metric);
+            }
+
+            metric.visible = true;
+            metric.update(core.usagePercent, formatPercent(core.usagePercent));
+        }
+
+        for (const [coreId, metric] of this._coreMetrics) {
+            if (!activeCoreIds.has(coreId))
+                metric.visible = false;
+        }
+    }
+
+    _updateMetrics(snapshot = null) {
         try {
-            const snapshot = this._telemetry.readSnapshot();
-            const cpuUsage = snapshot.cpu.usagePercent;
-            const memory = snapshot.memory;
+            const currentSnapshot = snapshot ?? this._telemetry.readSnapshot();
+            const cpuUsage = currentSnapshot.cpu.usagePercent;
+            const memory = currentSnapshot.memory;
 
             this._cpuValue.update(formatPercent(cpuUsage));
+            this._cpuValue.secondaryLabel.text =
+                `CPU TEMP ${formatTemperature(currentSnapshot.temperatureCelsius)}`;
             this._cpuProgress.update(cpuUsage, formatPercent(cpuUsage));
 
             if (Number.isFinite(cpuUsage)) {
@@ -163,12 +236,19 @@ export default class NatsHudExtension extends Extension {
                     this._cpuHistory.shift();
             }
             this._cpuSparkline.update(this._cpuHistory);
+            this._ensureCoreMetrics(currentSnapshot.cpu.cores);
 
             this._memoryValue.update(formatPercent(memory.usagePercent));
             this._memoryProgress.update(
                 memory.usagePercent,
                 `${formatBytes(memory.usedBytes)} / ${formatBytes(memory.totalBytes)}`
             );
+
+            const loadAverage = currentSnapshot.loadAverage;
+            this._systemMetrics.uptime.update(formatDuration(currentSnapshot.uptimeSeconds));
+            this._systemMetrics.loadOne.update(formatLoad(loadAverage.oneMinute));
+            this._systemMetrics.loadFive.update(formatLoad(loadAverage.fiveMinute));
+            this._systemMetrics.loadFifteen.update(formatLoad(loadAverage.fifteenMinute));
         } catch (error) {
             logError(error, 'NATS HUD: Failed to update system telemetry');
         }
@@ -194,5 +274,9 @@ export default class NatsHudExtension extends Extension {
         this._cpuProgress = null;
         this._memoryProgress = null;
         this._cpuSparkline = null;
+        this._coreMetrics = null;
+        this._coreColumns = null;
+        this._coreGrid = null;
+        this._systemMetrics = null;
     }
 }

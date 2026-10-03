@@ -36,3 +36,4 @@
 - `extension.js` coordinates the modules: it creates telemetry, builds the reusable widget tree, formats snapshots, and sends actions to the launcher without taking over those modules' responsibilities.
 - GNOME Shell calls `enable()` when activating an extension and `disable()` when deactivating it. Create actors, telemetry state, and timeout sources in `enable()`; remove the GLib source and destroy the actor tree in `disable()` so resources do not outlive the extension.
 - A GLib timeout returns a source ID that must be removed during teardown. Keep references to the existing widgets and update their values on each tick instead of rebuilding the actor hierarchy.
+- Build one per-core row for each `cpuN` identifier and retain it in a map. On each snapshot, look up that row and update its labels and progress fill; separating actor lifetime from sample lifetime avoids rebuilding the core grid every second.
