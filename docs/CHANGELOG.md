@@ -1,5 +1,10 @@
 # Changelog
 
+## Network and storage telemetry
+
+- Added active-interface download/upload rates and root filesystem capacity to the compact HUD.
+- Added restrained network and storage cards without changing existing CPU, memory, or system metrics.
+
 ## CPU detail integration
 
 - Added CPU temperature and compact per-core usage indicators to the CPU card.

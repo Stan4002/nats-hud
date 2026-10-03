@@ -13,6 +13,10 @@
     spacing: 10px;
 }
 
+.nats-data-row {
+    spacing: 10px;
+}
+
 .nats-actions-row {
     spacing: 7px;
 }
@@ -179,6 +183,43 @@
 
 .nats-system-metric .nats-metric-label {
     font-size: 8px;
+}
+
+.nats-network-values {
+    spacing: 10px;
+}
+
+.nats-network-metric .nats-metric-main {
+    font-size: 13px;
+}
+
+.nats-network-metric .nats-metric-label,
+.nats-network-interface,
+.nats-storage-free {
+    color: #9eabb4;
+    font-family: "FiraCode Nerd Font";
+    font-size: 8px;
+}
+
+.nats-data-row > .nats-glass-card:first-child {
+    border-top-color: rgba(112, 196, 198, 0.45);
+}
+
+.nats-data-row > .nats-glass-card:first-child .nats-card-icon,
+.nats-data-row > .nats-glass-card:first-child .nats-sparkline {
+    color: #83c9ca;
+}
+
+.nats-data-row > .nats-glass-card:last-child {
+    border-top-color: rgba(208, 166, 105, 0.45);
+}
+
+.nats-data-row > .nats-glass-card:last-child .nats-card-icon {
+    color: #d0a669;
+}
+
+.nats-data-row > .nats-glass-card:last-child .nats-progress-fill {
+    background-color: #d0a669;
 }
 
 .nats-section-header {

@@ -8,6 +8,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {SystemTelemetry} from './src/telemetry.js';
 import {
     formatBytes,
+    formatBytesPerSecond,
     formatDuration,
     formatLoad,
     formatPercent,
@@ -36,6 +37,7 @@ export default class NatsHudExtension extends Extension {
 
         this._telemetry = new SystemTelemetry();
         this._cpuHistory = [];
+        this._networkHistory = [];
         const initialSnapshot = this._telemetry.readSnapshot();
         this._buildHud(initialSnapshot.cpu.cores);
         this._updateMetrics(initialSnapshot);
@@ -121,6 +123,67 @@ export default class NatsHudExtension extends Extension {
         this._connectCardAction(this._memoryCard, openSystemMonitor);
         metricsRow.add_child(this._memoryCard);
         this._hud.add_child(metricsRow);
+
+        const dataRow = new St.BoxLayout({
+            style_class: 'nats-data-row',
+            x_expand: true
+        });
+
+        this._networkCard = new GlassCard({
+            title: 'NETWORK',
+            subtitle: 'Live interface traffic',
+            iconText: '⌁',
+            reactive: false
+        });
+        this._networkCard.x_expand = true;
+        const networkValues = new St.BoxLayout({
+            style_class: 'nats-network-values',
+            x_expand: true
+        });
+        this._networkDownload = new MetricValue({label: 'DOWNLOAD'});
+        this._networkUpload = new MetricValue({label: 'UPLOAD'});
+        for (const metric of [this._networkDownload, this._networkUpload]) {
+            metric.add_style_class_name('nats-network-metric');
+            metric.x_expand = true;
+            networkValues.add_child(metric);
+        }
+        this._networkInterface = new St.Label({
+            text: 'INTERFACE --',
+            style_class: 'nats-network-interface',
+            x_expand: true
+        });
+        this._networkSparkline = new SparklineLabel(this._networkHistory);
+        this._networkCard.body.add_child(networkValues);
+        this._networkCard.body.add_child(this._networkInterface);
+        this._networkCard.body.add_child(this._networkSparkline);
+        dataRow.add_child(this._networkCard);
+
+        this._storageCard = new GlassCard({
+            title: 'STORAGE',
+            subtitle: 'Root filesystem',
+            iconText: '▤',
+            reactive: false
+        });
+        this._storageCard.x_expand = true;
+        this._storageValue = new MetricValue({
+            value: '--',
+            label: 'ROOT USED'
+        });
+        this._storageProgress = new ProgressMetric({
+            label: 'CAPACITY',
+            percent: 0,
+            text: '-- / --'
+        });
+        this._storageFree = new St.Label({
+            text: 'FREE --',
+            style_class: 'nats-storage-free',
+            x_expand: true
+        });
+        this._storageCard.body.add_child(this._storageValue);
+        this._storageCard.body.add_child(this._storageProgress);
+        this._storageCard.body.add_child(this._storageFree);
+        dataRow.add_child(this._storageCard);
+        this._hud.add_child(dataRow);
 
         const actionsCard = new GlassCard({
             title: 'SYSTEM / ACTIONS',
@@ -224,6 +287,8 @@ export default class NatsHudExtension extends Extension {
             const currentSnapshot = snapshot ?? this._telemetry.readSnapshot();
             const cpuUsage = currentSnapshot.cpu.usagePercent;
             const memory = currentSnapshot.memory;
+            const network = currentSnapshot.network;
+            const storage = currentSnapshot.storage;
 
             this._cpuValue.update(formatPercent(cpuUsage));
             this._cpuValue.secondaryLabel.text =
@@ -237,6 +302,36 @@ export default class NatsHudExtension extends Extension {
             }
             this._cpuSparkline.update(this._cpuHistory);
             this._ensureCoreMetrics(currentSnapshot.cpu.cores);
+
+            this._networkDownload.update(
+                formatBytesPerSecond(network.downloadBytesPerSecond)
+            );
+            this._networkUpload.update(
+                formatBytesPerSecond(network.uploadBytesPerSecond)
+            );
+            this._networkInterface.text = network.interfaceName
+                ? `INTERFACE ${network.interfaceName}`
+                : 'INTERFACE --';
+
+            const downloadRate = network.downloadBytesPerSecond;
+            const uploadRate = network.uploadBytesPerSecond;
+            if (Number.isFinite(downloadRate) || Number.isFinite(uploadRate)) {
+                this._networkHistory.push(
+                    (Number.isFinite(downloadRate) ? downloadRate : 0) +
+                    (Number.isFinite(uploadRate) ? uploadRate : 0)
+                );
+                if (this._networkHistory.length > CPU_HISTORY_LIMIT)
+                    this._networkHistory.shift();
+            }
+            const networkScale = Math.max(1024, ...this._networkHistory);
+            this._networkSparkline.update(this._networkHistory, networkScale);
+
+            this._storageValue.update(formatPercent(storage.usagePercent));
+            this._storageProgress.update(
+                storage.usagePercent,
+                `${formatBytes(storage.usedBytes)} / ${formatBytes(storage.totalBytes)}`
+            );
+            this._storageFree.text = `FREE ${formatBytes(storage.freeBytes)}`;
 
             this._memoryValue.update(formatPercent(memory.usagePercent));
             this._memoryProgress.update(
@@ -274,6 +369,16 @@ export default class NatsHudExtension extends Extension {
         this._cpuProgress = null;
         this._memoryProgress = null;
         this._cpuSparkline = null;
+        this._networkHistory = [];
+        this._networkCard = null;
+        this._networkDownload = null;
+        this._networkUpload = null;
+        this._networkInterface = null;
+        this._networkSparkline = null;
+        this._storageCard = null;
+        this._storageValue = null;
+        this._storageProgress = null;
+        this._storageFree = null;
         this._coreMetrics = null;
         this._coreColumns = null;
         this._coreGrid = null;

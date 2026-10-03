@@ -7,6 +7,8 @@
 - CPU temperatures are optional sysfs data: thermal-zone `temp` files are preferred, with hwmon `temp*_input` as a fallback. These readings are typically millidegrees Celsius, and some systems expose no readable sensor.
 - `/proc/uptime` provides elapsed uptime in seconds. The first three fields of `/proc/loadavg` are the 1-, 5-, and 15-minute load averages.
 - CPU usage is the fraction of processor time spent non-idle over a sampling interval. Load average is the average number of runnable or uninterruptible tasks, not a CPU percentage; interpret it in relation to available CPU cores.
+- `/proc/net/dev` exposes cumulative receive/transmit byte counters per interface. A rate is the counter delta divided by elapsed time, so the first sample establishes a baseline and rates become meaningful only after a later sample.
+- Gio filesystem metadata provides root filesystem total/free capacity; used bytes are derived from those values. Capacity describes a filesystem, while `/proc/diskstats` describes block-device I/O, which is not necessarily attributable to `/` without mapping the mounted filesystem to its device.
 
 # Formatting: Data and Presentation
 

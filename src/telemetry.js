@@ -1,4 +1,5 @@
 import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
 
 function readTextFile(path) {
 	const file = Gio.File.new_for_path(path);
@@ -144,6 +145,75 @@ function readLoadAverage() {
 	};
 }
 
+function readNetworkCounters() {
+	const candidates = [];
+
+	for (const line of readTextFile('/proc/net/dev').split('\n').slice(2)) {
+		const match = line.match(/^\s*([^:]+):\s*(.*)$/);
+		if (!match)
+			continue;
+
+		const interfaceName = match[1].trim();
+		if (interfaceName === 'lo')
+			continue;
+
+		const counters = match[2].trim().split(/\s+/).map(Number);
+		if (counters.length < 16 || !counters.every(Number.isFinite))
+			continue;
+
+		const receiveBytes = counters[0];
+		const transmitBytes = counters[8];
+		const operstate = readOptionalTextFile(`/sys/class/net/${interfaceName}/operstate`);
+		const hasTraffic = receiveBytes + transmitBytes > 0;
+		const isUp = operstate === 'up' ||
+			((operstate === 'unknown' || operstate === null) && hasTraffic);
+
+		if (isUp) {
+			candidates.push({
+				interfaceName,
+				receiveBytes,
+				transmitBytes
+			});
+		}
+	}
+
+	candidates.sort((first, second) =>
+		(second.receiveBytes + second.transmitBytes) -
+		(first.receiveBytes + first.transmitBytes)
+	);
+
+	return candidates[0] ?? null;
+}
+
+function readRootFilesystem() {
+	try {
+		const info = Gio.File.new_for_path('/').query_filesystem_info(
+			'filesystem::size,filesystem::free',
+			null
+		);
+		const totalBytes = info.get_attribute_uint64('filesystem::size');
+		const freeBytes = info.get_attribute_uint64('filesystem::free');
+		if (!Number.isFinite(totalBytes) || !Number.isFinite(freeBytes) ||
+			totalBytes <= 0 || freeBytes < 0 || freeBytes > totalBytes)
+			throw new Error('Root filesystem returned invalid capacity values');
+
+		const usedBytes = totalBytes - freeBytes;
+		return {
+			totalBytes,
+			usedBytes,
+			freeBytes,
+			usagePercent: (usedBytes / totalBytes) * 100
+		};
+	} catch (_error) {
+		return {
+			totalBytes: null,
+			usedBytes: null,
+			freeBytes: null,
+			usagePercent: null
+		};
+	}
+}
+
 function readMemory() {
 	const entries = new Map();
 
@@ -172,6 +242,7 @@ function readMemory() {
 export class SystemTelemetry {
 	constructor() {
 		this._previousCpuCounters = new Map();
+		this._previousNetworkSample = null;
 	}
 
 	readSnapshot() {
@@ -200,6 +271,7 @@ export class SystemTelemetry {
 			}));
 
 		this._previousCpuCounters = currentCpuCounters;
+		const network = this._readNetworkSample();
 
 		return {
 			cpu: {
@@ -209,7 +281,45 @@ export class SystemTelemetry {
 			memory: readMemory(),
 			temperatureCelsius: readCpuTemperature(),
 			uptimeSeconds: readUptimeSeconds(),
-			loadAverage: readLoadAverage()
+			loadAverage: readLoadAverage(),
+			network,
+			storage: readRootFilesystem()
+		};
+	}
+
+	_readNetworkSample() {
+		const current = readNetworkCounters();
+		if (!current) {
+			this._previousNetworkSample = null;
+			return {
+				interfaceName: null,
+				downloadBytesPerSecond: null,
+				uploadBytesPerSecond: null
+			};
+		}
+
+		const sampledAt = GLib.get_monotonic_time() / 1000000;
+		let downloadBytesPerSecond = null;
+		let uploadBytesPerSecond = null;
+		const previous = this._previousNetworkSample;
+
+		if (previous && previous.interfaceName === current.interfaceName) {
+			const elapsedSeconds = sampledAt - previous.sampledAt;
+			if (elapsedSeconds > 0) {
+				const receivedDelta = current.receiveBytes - previous.receiveBytes;
+				const transmittedDelta = current.transmitBytes - previous.transmitBytes;
+				if (receivedDelta >= 0)
+					downloadBytesPerSecond = receivedDelta / elapsedSeconds;
+				if (transmittedDelta >= 0)
+					uploadBytesPerSecond = transmittedDelta / elapsedSeconds;
+			}
+		}
+
+		this._previousNetworkSample = {...current, sampledAt};
+		return {
+			interfaceName: current.interfaceName,
+			downloadBytesPerSecond,
+			uploadBytesPerSecond
 		};
 	}
 }
