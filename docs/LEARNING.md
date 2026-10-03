@@ -1,8 +1,12 @@
 # Telemetry: CPU and Memory
 
 - Linux exposes cumulative CPU time counters in `/proc/stat`. CPU usage is calculated from the difference between two samples, so the first sample has no percentage yet.
+- `/proc/stat` also reports cumulative counters for each `cpuN` core. Compare each core with its own previous counters; a newly appearing core has no usage percentage until it has two samples.
 - `/proc/meminfo` reports `MemTotal` and `MemAvailable` in KiB. `MemAvailable` estimates memory the system can allocate without swapping; it is more useful than `MemFree` for estimating memory pressure.
 - `Gio.File.load_contents()` reads these procfs files from GJS. `TextDecoder` converts the returned bytes to text without Node.js APIs.
+- CPU temperatures are optional sysfs data: thermal-zone `temp` files are preferred, with hwmon `temp*_input` as a fallback. These readings are typically millidegrees Celsius, and some systems expose no readable sensor.
+- `/proc/uptime` provides elapsed uptime in seconds. The first three fields of `/proc/loadavg` are the 1-, 5-, and 15-minute load averages.
+- CPU usage is the fraction of processor time spent non-idle over a sampling interval. Load average is the average number of runnable or uninterruptible tasks, not a CPU percentage; interpret it in relation to available CPU cores.
 
 # Formatting: Data and Presentation
 
