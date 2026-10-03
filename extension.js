@@ -49,21 +49,6 @@ export default class NatsHudExtension extends Extension {
             style_class: 'nats-hud'
         });
 
-        const header = new St.BoxLayout({
-            vertical: true,
-            style_class: 'nats-dashboard-header',
-            x_expand: true
-        });
-        header.add_child(new St.Label({
-            text: 'NATS // SYSTEM HUD',
-            style_class: 'nats-dashboard-title'
-        }));
-        header.add_child(new St.Label({
-            text: 'LIVE SYSTEM TELEMETRY',
-            style_class: 'nats-dashboard-subtitle'
-        }));
-        this._hud.add_child(header);
-
         const metricsRow = new St.BoxLayout({
             style_class: 'nats-metrics-row',
             x_expand: true
@@ -130,7 +115,7 @@ export default class NatsHudExtension extends Extension {
         this._hud.add_child(actionsCard);
 
         Main.layoutManager._backgroundGroup.add_child(this._hud);
-        this._hud.set_position(32, 84);
+        this._hud.set_position(32, 48);
     }
 
     _connectCardAction(card, action) {

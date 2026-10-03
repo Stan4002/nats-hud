@@ -1,29 +1,12 @@
 .nats-hud {
-    background-color: rgba(11, 16, 24, 0.9);
-    border: 1px solid rgba(237, 244, 248, 0.15);
-    border-radius: 20px;
-    padding: 17px;
-    spacing: 12px;
+    background-color: rgba(11, 16, 24, 0.78);
+    border: 1px solid rgba(237, 244, 248, 0.12);
+    border-radius: 19px;
+    padding: 13px;
+    spacing: 10px;
     min-width: 600px;
     max-width: 720px;
-    box-shadow: 0 8px 26px rgba(0, 0, 0, 0.26);
-}
-
-.nats-dashboard-header {
-    spacing: 2px;
-}
-
-.nats-dashboard-title {
-    color: #f1f5f7;
-    font-family: "FiraCode Nerd Font";
-    font-size: 15px;
-    font-weight: bold;
-}
-
-.nats-dashboard-subtitle {
-    color: #8796a2;
-    font-family: "FiraCode Nerd Font";
-    font-size: 9px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.22);
 }
 
 .nats-metrics-row {
