@@ -1,5 +1,6 @@
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
+import GObject from 'gi://GObject';
 
 import {clamp, makeSparkline} from './formatters.js';
 
@@ -13,7 +14,9 @@ function toDisplayText(value) {
 	return String(value);
 }
 
-export class GlassCard extends St.BoxLayout {
+export const GlassCard = GObject.registerClass({
+	GTypeName: 'NatsHudGlassCard'
+}, class GlassCard extends St.BoxLayout {
 	constructor({title = '', subtitle = null, iconText = null, reactive = true} = {}) {
 		super({
 			vertical: true,
@@ -69,9 +72,11 @@ export class GlassCard extends St.BoxLayout {
 		});
 		this.add_child(this.body);
 	}
-}
+});
 
-export class MetricValue extends St.BoxLayout {
+export const MetricValue = GObject.registerClass({
+	GTypeName: 'NatsHudMetricValue'
+}, class MetricValue extends St.BoxLayout {
 	constructor({value = '--', label = '', stateClass = null} = {}) {
 		super({
 			vertical: true,
@@ -111,9 +116,11 @@ export class MetricValue extends St.BoxLayout {
 		if (this._stateClass)
 			this.add_style_class_name(this._stateClass);
 	}
-}
+});
 
-export class ProgressMetric extends St.BoxLayout {
+export const ProgressMetric = GObject.registerClass({
+	GTypeName: 'NatsHudProgressMetric'
+}, class ProgressMetric extends St.BoxLayout {
 	constructor({label = '', percent = 0, text = '--'} = {}) {
 		super({
 			vertical: true,
@@ -153,9 +160,11 @@ export class ProgressMetric extends St.BoxLayout {
 		this.progressBar.fraction = clamp(percent, 0, 100) / 100;
 		this.valueLabel.text = toDisplayText(text);
 	}
-}
+});
 
-export class SparklineLabel extends St.Label {
+export const SparklineLabel = GObject.registerClass({
+	GTypeName: 'NatsHudSparklineLabel'
+}, class SparklineLabel extends St.Label {
 	constructor(values = [], maxValue = 100) {
 		super({
 			style_class: 'nats-sparkline',
@@ -168,9 +177,11 @@ export class SparklineLabel extends St.Label {
 	update(values, maxValue = 100) {
 		this.text = makeSparkline(values, maxValue);
 	}
-}
+});
 
-export class SectionHeader extends St.Label {
+export const SectionHeader = GObject.registerClass({
+	GTypeName: 'NatsHudSectionHeader'
+}, class SectionHeader extends St.Label {
 	constructor(text = '') {
 		super({
 			text: toDisplayText(text),
@@ -183,4 +194,4 @@ export class SectionHeader extends St.Label {
 	update(text) {
 		this.text = toDisplayText(text);
 	}
-}
+});
