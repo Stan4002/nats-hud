@@ -13,6 +13,7 @@
 
 - Small reusable St components give cards, metric values, progress indicators, sparklines, and section headings a consistent structure while keeping their presentation in `stylesheet.css`.
 - GObject-backed actors such as `St.BoxLayout` and `St.Label` require JavaScript subclasses to be registered with `GObject.registerClass()` before they can be instantiated; registration assigns each class a GType understood by GNOME Shell.
+- Verify GNOME Shell APIs against the actual target runtime: an API may be documented or available in another version but missing as a constructible widget here. When a widget is unavailable, composing ordinary St actors can provide the needed behavior with fewer runtime assumptions.
 - Update existing actors when telemetry refreshes instead of recreating them. This preserves layout and actor state, avoids repeated allocation and destruction, and keeps refresh work lightweight.
 - Keep UI components separate from telemetry: widgets display values they receive, while telemetry alone is responsible for collecting system data.
 

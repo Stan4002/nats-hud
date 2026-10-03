@@ -125,13 +125,14 @@
     font-weight: bold;
 }
 
-StProgressBar.nats-progress-bar {
+.nats-progress-track {
     height: 5px;
     border-radius: 3px;
     background-color: rgba(220, 236, 244, 0.13);
 }
 
-StProgressBar.nats-progress-bar .progress {
+.nats-progress-fill {
+    height: 5px;
     border-radius: 3px;
     background-color: #77c9d5;
 }

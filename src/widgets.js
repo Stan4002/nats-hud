@@ -145,20 +145,31 @@ export const ProgressMetric = GObject.registerClass({
 		header.add_child(this.labelLabel);
 		header.add_child(this.valueLabel);
 
-		this.progressBar = new St.ProgressBar({
-			style_class: 'nats-progress-bar',
-			x_expand: true,
-			y_align: Clutter.ActorAlign.CENTER
+		this.progressTrack = new St.Widget({
+			style_class: 'nats-progress-track',
+			x_expand: true
 		});
+		this.progressFill = new St.Widget({
+			style_class: 'nats-progress-fill',
+			x_align: Clutter.ActorAlign.START
+		});
+		this.progressTrack.add_child(this.progressFill);
+		this.progressTrack.connect('notify::width', () => this._updateFillWidth());
 
 		this.add_child(header);
-		this.add_child(this.progressBar);
+		this.add_child(this.progressTrack);
 		this.update(percent, text);
 	}
 
 	update(percent, text) {
-		this.progressBar.fraction = clamp(percent, 0, 100) / 100;
+		this._percent = clamp(percent, 0, 100);
+		this._updateFillWidth();
 		this.valueLabel.text = toDisplayText(text);
+	}
+
+	_updateFillWidth() {
+		const trackWidth = this.progressTrack.get_width();
+		this.progressFill.set_width(trackWidth * this._percent / 100);
 	}
 });
 
