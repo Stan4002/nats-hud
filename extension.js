@@ -27,7 +27,6 @@ import {
     openTerminal
 } from './src/launcher.js';
 
-const UPDATE_INTERVAL_SECONDS = 1;
 const CPU_HISTORY_LIMIT = 30;
 
 export default class NatsHudExtension extends Extension {
@@ -35,6 +34,12 @@ export default class NatsHudExtension extends Extension {
         if (this._hud)
             return;
 
+        this._settings = this.getSettings();
+        this._settingsChangedId = this._settings.connect('changed', (_settings, key) => {
+            this._applySettings();
+            if (key === 'update-interval')
+                this._restartUpdateTimer();
+        });
         this._telemetry = new SystemTelemetry();
         this._cpuHistory = [];
         this._networkHistory = [];
@@ -45,15 +50,8 @@ export default class NatsHudExtension extends Extension {
             () => this._positionHud()
         );
         this._updateMetrics(initialSnapshot);
-
-        this._timer = GLib.timeout_add_seconds(
-            GLib.PRIORITY_DEFAULT,
-            UPDATE_INTERVAL_SECONDS,
-            () => {
-                this._updateMetrics();
-                return GLib.SOURCE_CONTINUE;
-            }
-        );
+        this._applySettings();
+        this._restartUpdateTimer();
     }
 
     _buildHud(initialCores) {
@@ -76,6 +74,7 @@ export default class NatsHudExtension extends Extension {
             iconText: '◉'
         });
         this._cpuCard.add_style_class_name('nats-cpu-card');
+        this._connectCardOpacity(this._cpuCard);
         this._cpuCard.x_expand = true;
         this._cpuCard.y_expand = true;
         this._cpuCard.body.y_expand = true;
@@ -120,6 +119,7 @@ export default class NatsHudExtension extends Extension {
             iconText: '▦'
         });
         this._memoryCard.add_style_class_name('nats-memory-card');
+        this._connectCardOpacity(this._memoryCard);
         this._memoryCard.x_expand = true;
         this._memoryCard.y_expand = true;
         this._memoryCard.body.y_expand = true;
@@ -343,6 +343,70 @@ export default class NatsHudExtension extends Extension {
         this._positionHud();
     }
 
+    _connectCardOpacity(card) {
+        card.connect('enter-event', () => {
+            this._setCardOpacity(card, true);
+            return Clutter.EVENT_PROPAGATE;
+        });
+        card.connect('leave-event', () => {
+            this._setCardOpacity(card, false);
+            return Clutter.EVENT_PROPAGATE;
+        });
+    }
+
+    _setCardOpacity(card, hovered = false) {
+        if (!card)
+            return;
+
+        const opacity = Math.min(0.9, this._cardOpacity + (hovered ? 0.06 : 0));
+        card.set_style(`background-color: rgba(24, 32, 43, ${opacity});`);
+    }
+
+    _applySettings() {
+        this._cardOpacity = this._settings.get_double('card-opacity');
+
+        for (const card of [
+            this._cpuCard,
+            this._memoryCard,
+            this._systemCard,
+            this._networkCard,
+            this._storageCard,
+            this._powerCard,
+            this._activityCard,
+            this._quickActionsCard
+        ]) {
+            this._setCardOpacity(card, card?.hover ?? false);
+        }
+
+        const visibilitySettings = [
+            ['show-cpu', this._cpuCard],
+            ['show-memory', this._memoryCard],
+            ['show-system', this._systemCard],
+            ['show-network', this._networkCard],
+            ['show-storage', this._storageCard],
+            ['show-power', this._powerCard],
+            ['show-activity', this._activityCard],
+            ['show-actions', this._quickActionsCard]
+        ];
+
+        for (const [key, actor] of visibilitySettings)
+            actor.visible = this._settings.get_boolean(key);
+    }
+
+    _restartUpdateTimer() {
+        if (this._timer !== null && this._timer !== undefined)
+            GLib.source_remove(this._timer);
+
+        this._timer = GLib.timeout_add_seconds(
+            GLib.PRIORITY_DEFAULT,
+            this._settings.get_int('update-interval'),
+            () => {
+                this._updateMetrics();
+                return GLib.SOURCE_CONTINUE;
+            }
+        );
+    }
+
     _positionHud() {
         if (!this._hud)
             return;
@@ -501,6 +565,11 @@ export default class NatsHudExtension extends Extension {
             this._monitorChangedId = null;
         }
 
+        if (this._settings && this._settingsChangedId) {
+            this._settings.disconnect(this._settingsChangedId);
+            this._settingsChangedId = null;
+        }
+
         if (this._hud) {
             this._hud.destroy();
             this._hud = null;
@@ -535,5 +604,6 @@ export default class NatsHudExtension extends Extension {
         this._quickActionsCard = null;
         this._powerCard = null;
         this._systemCard = null;
+        this._settings = null;
     }
 }
