@@ -1,22 +1,53 @@
 .nats-hud {
     background-color: rgba(10, 14, 20, 0.58);
     border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 22px;
-    padding: 22px;
-    min-width: 330px;
+    border-radius: 18px;
+    padding: 18px;
+    spacing: 14px;
+    min-width: 620px;
+    max-width: 760px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
 }
 
-.nats-title {
-    font-family: "FiraCode Nerd Font";
-    font-size: 17px;
-    font-weight: bold;
-    margin-bottom: 18px;
+.nats-dashboard-header {
+    spacing: 3px;
 }
 
-.nats-stats {
+.nats-dashboard-title {
+    color: #eef3f5;
     font-family: "FiraCode Nerd Font";
-    font-size: 13px;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.nats-dashboard-subtitle {
+    color: #aab8c0;
+    font-family: "FiraCode Nerd Font";
+    font-size: 10px;
+}
+
+.nats-metrics-row {
+    spacing: 12px;
+}
+
+.nats-actions-row {
+    spacing: 8px;
+}
+
+.nats-action-button {
+    padding: 8px 10px;
+    background-color: rgba(220, 236, 244, 0.08);
+    border: 1px solid rgba(220, 236, 244, 0.12);
+    border-radius: 8px;
+    color: #dce6e9;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+.nats-action-button:hover,
+.nats-action-button:focus {
+    background-color: rgba(119, 201, 213, 0.18);
+    border-color: rgba(119, 201, 213, 0.35);
 }
 
 .nats-glass-card {
