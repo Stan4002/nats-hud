@@ -8,3 +8,9 @@
 
 - Keep telemetry responsible for collecting raw measurements, formatters responsible for converting values into readable text, and widgets responsible for displaying that text. This makes formatting independently testable and reusable without system access or GNOME UI dependencies.
 - Return a consistent placeholder for unavailable numeric values, and clamp bounded visual indicators such as percentages and text bars before rendering them.
+
+# Reusable UI Components
+
+- Small reusable St components give cards, metric values, progress indicators, sparklines, and section headings a consistent structure while keeping their presentation in `stylesheet.css`.
+- Update existing actors when telemetry refreshes instead of recreating them. This preserves layout and actor state, avoids repeated allocation and destruction, and keeps refresh work lightweight.
+- Keep UI components separate from telemetry: widgets display values they receive, while telemetry alone is responsible for collecting system data.

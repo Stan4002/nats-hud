@@ -18,3 +18,100 @@
     font-family: "FiraCode Nerd Font";
     font-size: 13px;
 }
+
+.nats-glass-card {
+    spacing: 12px;
+    padding: 16px;
+    background-color: rgba(18, 25, 34, 0.82);
+    border: 1px solid rgba(220, 236, 244, 0.14);
+    border-radius: 16px;
+}
+
+.nats-glass-card:hover {
+    background-color: rgba(24, 33, 43, 0.88);
+    border-color: rgba(220, 236, 244, 0.24);
+}
+
+.nats-card-header {
+    spacing: 10px;
+}
+
+.nats-card-heading {
+    spacing: 3px;
+}
+
+.nats-card-icon {
+    color: #8bcbd7;
+    font-size: 16px;
+}
+
+.nats-card-title {
+    color: #eef3f5;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.nats-card-subtitle {
+    color: #aab8c0;
+    font-size: 11px;
+}
+
+.nats-card-body {
+    spacing: 10px;
+}
+
+.nats-metric-value {
+    spacing: 3px;
+}
+
+.nats-metric-main {
+    color: #f1f5f6;
+    font-size: 26px;
+    font-weight: bold;
+}
+
+.nats-metric-label {
+    color: #aab8c0;
+    font-size: 11px;
+}
+
+.nats-progress-metric {
+    spacing: 7px;
+}
+
+.nats-progress-header {
+    spacing: 12px;
+}
+
+.nats-progress-label {
+    color: #cbd5da;
+    font-size: 11px;
+}
+
+.nats-progress-value {
+    color: #eef3f5;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+StProgressBar.nats-progress-bar {
+    height: 5px;
+    border-radius: 3px;
+    background-color: rgba(220, 236, 244, 0.13);
+}
+
+StProgressBar.nats-progress-bar .progress {
+    border-radius: 3px;
+    background-color: #77c9d5;
+}
+
+.nats-sparkline {
+    color: #83c8d4;
+    font-size: 15px;
+}
+
+.nats-section-header {
+    color: #aab8c0;
+    font-size: 10px;
+    font-weight: bold;
+}
