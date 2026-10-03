@@ -17,6 +17,10 @@
 - Update existing actors when telemetry refreshes instead of recreating them. This preserves layout and actor state, avoids repeated allocation and destruction, and keeps refresh work lightweight.
 - Keep UI components separate from telemetry: widgets display values they receive, while telemetry alone is responsible for collecting system data.
 
+## GNOME Shell CSS
+
+- GNOME Shell styles use a GTK/St CSS subset, not a browser engine. Validate selectors and transitions in the running Shell, and do not rely on browser-only features such as `backdrop-filter`; translucent actor backgrounds provide a compatible glass effect.
+
 # Process Launching
 
 - `Gio.Subprocess` launches a child process without blocking the Shell, and its asynchronous wait API can report unsuccessful exits.

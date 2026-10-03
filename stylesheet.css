@@ -1,149 +1,190 @@
 .nats-hud {
-    background-color: rgba(10, 14, 20, 0.58);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 18px;
-    padding: 18px;
-    spacing: 14px;
-    min-width: 620px;
-    max-width: 760px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+    background-color: rgba(11, 16, 24, 0.9);
+    border: 1px solid rgba(237, 244, 248, 0.15);
+    border-radius: 20px;
+    padding: 17px;
+    spacing: 12px;
+    min-width: 600px;
+    max-width: 720px;
+    box-shadow: 0 8px 26px rgba(0, 0, 0, 0.26);
 }
 
 .nats-dashboard-header {
-    spacing: 3px;
+    spacing: 2px;
 }
 
 .nats-dashboard-title {
-    color: #eef3f5;
+    color: #f1f5f7;
     font-family: "FiraCode Nerd Font";
-    font-size: 16px;
+    font-size: 15px;
     font-weight: bold;
 }
 
 .nats-dashboard-subtitle {
-    color: #aab8c0;
+    color: #8796a2;
     font-family: "FiraCode Nerd Font";
-    font-size: 10px;
+    font-size: 9px;
 }
 
 .nats-metrics-row {
-    spacing: 12px;
+    spacing: 10px;
 }
 
 .nats-actions-row {
-    spacing: 8px;
+    spacing: 7px;
 }
 
 .nats-action-button {
-    padding: 8px 10px;
-    background-color: rgba(220, 236, 244, 0.08);
-    border: 1px solid rgba(220, 236, 244, 0.12);
-    border-radius: 8px;
-    color: #dce6e9;
-    font-size: 10px;
+    padding: 7px 9px;
+    background-color: rgba(226, 237, 244, 0.07);
+    border: 1px solid rgba(226, 237, 244, 0.12);
+    border-radius: 9px;
+    color: #d8e1e6;
+    font-family: "FiraCode Nerd Font";
+    font-size: 9px;
     font-weight: bold;
+    transition-duration: 140ms;
 }
 
 .nats-action-button:hover,
 .nats-action-button:focus {
-    background-color: rgba(119, 201, 213, 0.18);
-    border-color: rgba(119, 201, 213, 0.35);
+    background-color: rgba(155, 207, 219, 0.15);
+    border-color: rgba(155, 207, 219, 0.3);
+    color: #f1f7f8;
+}
+
+.nats-action-button:active {
+    background-color: rgba(155, 207, 219, 0.22);
 }
 
 .nats-glass-card {
-    spacing: 12px;
-    padding: 16px;
-    background-color: rgba(18, 25, 34, 0.82);
-    border: 1px solid rgba(220, 236, 244, 0.14);
-    border-radius: 16px;
+    spacing: 10px;
+    padding: 14px;
+    background-color: rgba(24, 32, 43, 0.7);
+    border: 1px solid rgba(226, 237, 244, 0.12);
+    border-radius: 18px;
+    transition-duration: 160ms;
 }
 
 .nats-glass-card:hover {
-    background-color: rgba(24, 33, 43, 0.88);
-    border-color: rgba(220, 236, 244, 0.24);
+    background-color: rgba(32, 42, 55, 0.82);
+    border-color: rgba(226, 237, 244, 0.2);
 }
 
 .nats-card-header {
-    spacing: 10px;
+    spacing: 9px;
 }
 
 .nats-card-heading {
-    spacing: 3px;
+    spacing: 2px;
 }
 
 .nats-card-icon {
-    color: #8bcbd7;
-    font-size: 16px;
+    color: #b3c0c8;
+    font-size: 15px;
 }
 
 .nats-card-title {
-    color: #eef3f5;
-    font-size: 13px;
+    color: #e8eef1;
+    font-family: "FiraCode Nerd Font";
+    font-size: 11px;
     font-weight: bold;
 }
 
 .nats-card-subtitle {
-    color: #aab8c0;
-    font-size: 11px;
+    color: #95a3ad;
+    font-family: "FiraCode Nerd Font";
+    font-size: 9px;
 }
 
 .nats-card-body {
-    spacing: 10px;
+    spacing: 9px;
 }
 
 .nats-metric-value {
-    spacing: 3px;
+    spacing: 2px;
 }
 
 .nats-metric-main {
-    color: #f1f5f6;
-    font-size: 26px;
+    color: #f0f4f6;
+    font-family: "FiraCode Nerd Font";
+    font-size: 24px;
     font-weight: bold;
 }
 
 .nats-metric-label {
-    color: #aab8c0;
-    font-size: 11px;
+    color: #929fa9;
+    font-family: "FiraCode Nerd Font";
+    font-size: 9px;
 }
 
 .nats-progress-metric {
-    spacing: 7px;
+    spacing: 6px;
 }
 
 .nats-progress-header {
-    spacing: 12px;
+    spacing: 10px;
 }
 
 .nats-progress-label {
-    color: #cbd5da;
-    font-size: 11px;
+    color: #aebbc3;
+    font-family: "FiraCode Nerd Font";
+    font-size: 9px;
 }
 
 .nats-progress-value {
-    color: #eef3f5;
-    font-size: 11px;
+    color: #dce5e9;
+    font-family: "FiraCode Nerd Font";
+    font-size: 9px;
     font-weight: bold;
 }
 
 .nats-progress-track {
-    height: 5px;
-    border-radius: 3px;
-    background-color: rgba(220, 236, 244, 0.13);
+    height: 6px;
+    border-radius: 4px;
+    background-color: rgba(231, 239, 244, 0.12);
 }
 
 .nats-progress-fill {
-    height: 5px;
-    border-radius: 3px;
-    background-color: #77c9d5;
+    height: 6px;
+    border-radius: 4px;
+    background-color: #85c8d6;
 }
 
 .nats-sparkline {
-    color: #83c8d4;
-    font-size: 15px;
+    color: #85c8d6;
+    font-family: "FiraCode Nerd Font";
+    font-size: 14px;
 }
 
 .nats-section-header {
-    color: #aab8c0;
-    font-size: 10px;
+    color: #9eabb4;
+    font-family: "FiraCode Nerd Font";
+    font-size: 9px;
     font-weight: bold;
+}
+
+.nats-metrics-row > .nats-glass-card:first-child {
+    border-top-color: rgba(118, 203, 220, 0.5);
+}
+
+.nats-metrics-row > .nats-glass-card:first-child .nats-card-icon,
+.nats-metrics-row > .nats-glass-card:first-child .nats-sparkline {
+    color: #82cddd;
+}
+
+.nats-metrics-row > .nats-glass-card:first-child .nats-progress-fill {
+    background-color: #73c2d3;
+}
+
+.nats-metrics-row > .nats-glass-card:last-child {
+    border-top-color: rgba(177, 151, 219, 0.5);
+}
+
+.nats-metrics-row > .nats-glass-card:last-child .nats-card-icon {
+    color: #b5a0dc;
+}
+
+.nats-metrics-row > .nats-glass-card:last-child .nats-progress-fill {
+    background-color: #a78bd5;
 }
