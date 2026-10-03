@@ -1,24 +1,43 @@
 .nats-hud {
-    background-color: rgba(11, 16, 24, 0.78);
-    border: 1px solid rgba(237, 244, 248, 0.12);
-    border-radius: 19px;
-    padding: 13px;
-    spacing: 10px;
-    min-width: 600px;
-    max-width: 720px;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.22);
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    spacing: 12px;
 }
 
-.nats-metrics-row {
-    spacing: 10px;
+.nats-top-row,
+.nats-middle-row,
+.nats-lower-row {
+    spacing: 14px;
 }
 
-.nats-data-row {
-    spacing: 10px;
+.nats-top-row {
+    min-height: 260px;
 }
 
-.nats-actions-row {
-    spacing: 7px;
+.nats-middle-row,
+.nats-lower-row {
+    min-height: 180px;
+}
+
+.nats-top-row > .nats-glass-card,
+.nats-middle-row > .nats-glass-card {
+    min-width: 0;
+}
+
+.nats-activity-card {
+    min-width: 0;
+}
+
+.nats-quick-actions-card {
+    min-width: 230px;
+    max-width: 320px;
+}
+
+.nats-actions-grid,
+.nats-action-column {
+    spacing: 9px;
 }
 
 .nats-action-button {
@@ -47,15 +66,15 @@
 .nats-glass-card {
     spacing: 10px;
     padding: 14px;
-    background-color: rgba(24, 32, 43, 0.7);
-    border: 1px solid rgba(226, 237, 244, 0.12);
-    border-radius: 18px;
+    background-color: rgba(24, 32, 43, 0.52);
+    border: 1px solid rgba(226, 237, 244, 0.1);
+    border-radius: 20px;
     transition-duration: 160ms;
 }
 
 .nats-glass-card:hover {
-    background-color: rgba(32, 42, 55, 0.82);
-    border-color: rgba(226, 237, 244, 0.2);
+    background-color: rgba(32, 42, 55, 0.62);
+    border-color: rgba(226, 237, 244, 0.18);
 }
 
 .nats-card-header {
@@ -229,27 +248,77 @@
     font-weight: bold;
 }
 
-.nats-metrics-row > .nats-glass-card:first-child {
+.nats-cpu-card {
     border-top-color: rgba(118, 203, 220, 0.5);
 }
 
-.nats-metrics-row > .nats-glass-card:first-child .nats-card-icon,
-.nats-metrics-row > .nats-glass-card:first-child .nats-sparkline {
+.nats-cpu-card .nats-card-icon,
+.nats-cpu-card .nats-sparkline {
     color: #82cddd;
 }
 
-.nats-metrics-row > .nats-glass-card:first-child .nats-progress-fill {
+.nats-cpu-card .nats-progress-fill {
     background-color: #73c2d3;
 }
 
-.nats-metrics-row > .nats-glass-card:last-child {
+.nats-memory-card {
     border-top-color: rgba(177, 151, 219, 0.5);
 }
 
-.nats-metrics-row > .nats-glass-card:last-child .nats-card-icon {
+.nats-memory-card .nats-card-icon {
     color: #b5a0dc;
 }
 
-.nats-metrics-row > .nats-glass-card:last-child .nats-progress-fill {
+.nats-memory-card .nats-progress-fill {
     background-color: #a78bd5;
+}
+
+.nats-network-card {
+    border-top-color: rgba(112, 196, 198, 0.45);
+}
+
+.nats-network-card .nats-card-icon,
+.nats-network-card .nats-sparkline {
+    color: #83c9ca;
+}
+
+.nats-storage-card {
+    border-top-color: rgba(208, 166, 105, 0.45);
+}
+
+.nats-storage-card .nats-card-icon,
+.nats-storage-card .nats-progress-fill {
+    color: #d0a669;
+    background-color: #d0a669;
+}
+
+.nats-system-card {
+    border-top-color: rgba(190, 207, 219, 0.35);
+}
+
+.nats-power-card {
+    border-top-color: rgba(190, 207, 219, 0.25);
+}
+
+.nats-reserved-note {
+    color: #8f9da7;
+    font-family: "FiraCode Nerd Font";
+    font-size: 10px;
+}
+
+.nats-activity-values {
+    spacing: 14px;
+}
+
+.nats-history-track {
+    spacing: 7px;
+    padding: 8px 10px;
+    background-color: rgba(226, 237, 244, 0.035);
+    border-radius: 12px;
+}
+
+.nats-history-label {
+    color: #9eabb4;
+    font-family: "FiraCode Nerd Font";
+    font-size: 9px;
 }

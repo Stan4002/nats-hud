@@ -1,5 +1,11 @@
 # Changelog
 
+## Full desktop HUD layout
+
+- Distributed telemetry cards across a responsive primary-monitor layout below the GNOME panel.
+- Added neutral system/power and history areas with compact quick actions.
+- Kept the root transparent and non-reactive so the wallpaper shows through and desktop input remains unobstructed.
+
 ## Network and storage telemetry
 
 - Added active-interface download/upload rates and root filesystem capacity to the compact HUD.

@@ -40,6 +40,10 @@ export default class NatsHudExtension extends Extension {
         this._networkHistory = [];
         const initialSnapshot = this._telemetry.readSnapshot();
         this._buildHud(initialSnapshot.cpu.cores);
+        this._monitorChangedId = Main.layoutManager.connect(
+            'monitors-changed',
+            () => this._positionHud()
+        );
         this._updateMetrics(initialSnapshot);
 
         this._timer = GLib.timeout_add_seconds(
@@ -55,12 +59,15 @@ export default class NatsHudExtension extends Extension {
     _buildHud(initialCores) {
         this._hud = new St.BoxLayout({
             vertical: true,
-            style_class: 'nats-hud'
+            style_class: 'nats-hud',
+            reactive: false,
+            track_hover: false
         });
 
         const metricsRow = new St.BoxLayout({
-            style_class: 'nats-metrics-row',
-            x_expand: true
+            style_class: 'nats-top-row',
+            x_expand: true,
+            y_expand: true
         });
 
         this._cpuCard = new GlassCard({
@@ -68,7 +75,10 @@ export default class NatsHudExtension extends Extension {
             subtitle: 'Live processor load',
             iconText: '◉'
         });
+        this._cpuCard.add_style_class_name('nats-cpu-card');
         this._cpuCard.x_expand = true;
+        this._cpuCard.y_expand = true;
+        this._cpuCard.body.y_expand = true;
         this._cpuValue = new MetricValue({
             value: '--',
             label: 'Processor usage'
@@ -99,6 +109,7 @@ export default class NatsHudExtension extends Extension {
             this._coreGrid.add_child(column);
         }
         this._ensureCoreMetrics(initialCores);
+        this._coreGrid.y_expand = true;
         this._cpuCard.body.add_child(this._coreGrid);
         this._connectCardAction(this._cpuCard, openBtop);
         metricsRow.add_child(this._cpuCard);
@@ -108,7 +119,10 @@ export default class NatsHudExtension extends Extension {
             subtitle: 'Live memory allocation',
             iconText: '▦'
         });
+        this._memoryCard.add_style_class_name('nats-memory-card');
         this._memoryCard.x_expand = true;
+        this._memoryCard.y_expand = true;
+        this._memoryCard.body.y_expand = true;
         this._memoryValue = new MetricValue({
             value: '--',
             label: 'Memory in use'
@@ -122,11 +136,42 @@ export default class NatsHudExtension extends Extension {
         this._memoryCard.body.add_child(this._memoryProgress);
         this._connectCardAction(this._memoryCard, openSystemMonitor);
         metricsRow.add_child(this._memoryCard);
+
+        this._systemCard = new GlassCard({
+            title: 'SYSTEM',
+            subtitle: 'Uptime and load',
+            iconText: '◌',
+            reactive: false
+        });
+        this._systemCard.add_style_class_name('nats-system-card');
+        this._systemCard.x_expand = true;
+        this._systemCard.y_expand = true;
+        this._systemCard.body.y_expand = true;
+        const systemValues = new St.BoxLayout({
+            vertical: true,
+            style_class: 'nats-system-values',
+            x_expand: true,
+            y_expand: true
+        });
+        this._systemMetrics = {
+            uptime: new MetricValue({label: 'UPTIME'}),
+            loadOne: new MetricValue({label: 'LOAD 1M'}),
+            loadFive: new MetricValue({label: 'LOAD 5M'}),
+            loadFifteen: new MetricValue({label: 'LOAD 15M'})
+        };
+        for (const metric of Object.values(this._systemMetrics)) {
+            metric.add_style_class_name('nats-system-metric');
+            metric.x_expand = true;
+            systemValues.add_child(metric);
+        }
+        this._systemCard.body.add_child(systemValues);
+        metricsRow.add_child(this._systemCard);
         this._hud.add_child(metricsRow);
 
         const dataRow = new St.BoxLayout({
-            style_class: 'nats-data-row',
-            x_expand: true
+            style_class: 'nats-middle-row',
+            x_expand: true,
+            y_expand: true
         });
 
         this._networkCard = new GlassCard({
@@ -135,7 +180,10 @@ export default class NatsHudExtension extends Extension {
             iconText: '⌁',
             reactive: false
         });
+        this._networkCard.add_style_class_name('nats-network-card');
         this._networkCard.x_expand = true;
+        this._networkCard.y_expand = true;
+        this._networkCard.body.y_expand = true;
         const networkValues = new St.BoxLayout({
             style_class: 'nats-network-values',
             x_expand: true
@@ -164,7 +212,10 @@ export default class NatsHudExtension extends Extension {
             iconText: '▤',
             reactive: false
         });
+        this._storageCard.add_style_class_name('nats-storage-card');
         this._storageCard.x_expand = true;
+        this._storageCard.y_expand = true;
+        this._storageCard.body.y_expand = true;
         this._storageValue = new MetricValue({
             value: '--',
             label: 'ROOT USED'
@@ -183,44 +234,132 @@ export default class NatsHudExtension extends Extension {
         this._storageCard.body.add_child(this._storageProgress);
         this._storageCard.body.add_child(this._storageFree);
         dataRow.add_child(this._storageCard);
+
+        this._powerCard = new GlassCard({
+            title: 'POWER',
+            subtitle: 'Reserved',
+            iconText: '◍',
+            reactive: false
+        });
+        this._powerCard.add_style_class_name('nats-power-card');
+        this._powerCard.x_expand = true;
+        this._powerCard.y_expand = true;
+        this._powerCard.body.y_expand = true;
+        this._powerCard.body.add_child(new St.Label({
+            text: 'Power telemetry not active',
+            style_class: 'nats-reserved-note',
+            x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER
+        }));
+        dataRow.add_child(this._powerCard);
         this._hud.add_child(dataRow);
 
-        const actionsCard = new GlassCard({
-            title: 'SYSTEM / ACTIONS',
-            subtitle: 'Quick access to system tools',
+        const lowerRow = new St.BoxLayout({
+            style_class: 'nats-lower-row',
+            x_expand: true,
+            y_expand: true
+        });
+
+        this._activityCard = new GlassCard({
+            title: 'ACTIVITY / HISTORY',
+            iconText: '⌁',
+            reactive: false
+        });
+        this._activityCard.add_style_class_name('nats-activity-card');
+        this._activityCard.x_expand = true;
+        this._activityCard.y_expand = true;
+        this._activityCard.body.y_expand = true;
+        const activityValues = new St.BoxLayout({
+            vertical: true,
+            style_class: 'nats-activity-values',
+            x_expand: true,
+            y_expand: true
+        });
+        const cpuHistory = new St.BoxLayout({
+            vertical: true,
+            style_class: 'nats-history-track',
+            x_expand: true,
+            y_expand: true
+        });
+        cpuHistory.add_child(new St.Label({
+            text: 'CPU',
+            style_class: 'nats-history-label'
+        }));
+        this._activityCpuSparkline = new SparklineLabel(this._cpuHistory);
+        cpuHistory.add_child(this._activityCpuSparkline);
+
+        const networkActivity = new St.BoxLayout({
+            vertical: true,
+            style_class: 'nats-history-track',
+            x_expand: true,
+            y_expand: true
+        });
+        networkActivity.add_child(new St.Label({
+            text: 'NETWORK',
+            style_class: 'nats-history-label'
+        }));
+        this._activityNetworkSparkline = new SparklineLabel(this._networkHistory);
+        networkActivity.add_child(this._activityNetworkSparkline);
+        activityValues.add_child(cpuHistory);
+        activityValues.add_child(networkActivity);
+        this._activityCard.body.add_child(activityValues);
+        lowerRow.add_child(this._activityCard);
+
+        this._quickActionsCard = new GlassCard({
+            title: 'QUICK ACTIONS',
             iconText: '⌘',
             reactive: false
         });
-        const systemValues = new St.BoxLayout({
-            style_class: 'nats-system-values',
+        this._quickActionsCard.add_style_class_name('nats-quick-actions-card');
+        this._quickActionsCard.y_expand = true;
+        this._quickActionsCard.body.y_expand = true;
+        this._quickActionsCard.x_expand = false;
+        const actionsGrid = new St.BoxLayout({
+            style_class: 'nats-actions-grid',
+            x_expand: true,
+            y_expand: true
+        });
+        const primaryActions = new St.BoxLayout({
+            vertical: true,
+            style_class: 'nats-action-column',
             x_expand: true
         });
-        this._systemMetrics = {
-            uptime: new MetricValue({label: 'UPTIME'}),
-            loadOne: new MetricValue({label: 'LOAD 1M'}),
-            loadFive: new MetricValue({label: 'LOAD 5M'}),
-            loadFifteen: new MetricValue({label: 'LOAD 15M'})
-        };
-        for (const metric of Object.values(this._systemMetrics)) {
-            metric.add_style_class_name('nats-system-metric');
-            metric.x_expand = true;
-            systemValues.add_child(metric);
-        }
-        actionsCard.body.add_child(systemValues);
-
-        const actionsRow = new St.BoxLayout({
-            style_class: 'nats-actions-row',
+        const secondaryActions = new St.BoxLayout({
+            vertical: true,
+            style_class: 'nats-action-column',
             x_expand: true
         });
-        actionsRow.add_child(this._createActionButton('BTOP', openBtop));
-        actionsRow.add_child(this._createActionButton('SYSTEM MONITOR', openSystemMonitor));
-        actionsRow.add_child(this._createActionButton('FILES', openFiles));
-        actionsRow.add_child(this._createActionButton('TERMINAL', openTerminal));
-        actionsCard.body.add_child(actionsRow);
-        this._hud.add_child(actionsCard);
+        primaryActions.add_child(this._createActionButton('BTOP', openBtop));
+        primaryActions.add_child(this._createActionButton('FILES', openFiles));
+        secondaryActions.add_child(this._createActionButton('SYSTEM MONITOR', openSystemMonitor));
+        secondaryActions.add_child(this._createActionButton('TERMINAL', openTerminal));
+        actionsGrid.add_child(primaryActions);
+        actionsGrid.add_child(secondaryActions);
+        this._quickActionsCard.body.add_child(actionsGrid);
+        lowerRow.add_child(this._quickActionsCard);
+        this._hud.add_child(lowerRow);
 
         Main.layoutManager._backgroundGroup.add_child(this._hud);
-        this._hud.set_position(32, Main.panel.height + 12);
+        this._positionHud();
+    }
+
+    _positionHud() {
+        if (!this._hud)
+            return;
+
+        const monitor = Main.layoutManager.primaryMonitor;
+        if (!monitor)
+            return;
+
+        const sideMargin = 20;
+        const topInset = Main.panel.height + 12;
+        const bottomMargin = 24;
+        const width = Math.max(1, monitor.width - sideMargin * 2);
+        const height = Math.max(1, monitor.height - topInset - bottomMargin);
+
+        this._hud.set_position(monitor.x + sideMargin, monitor.y + topInset);
+        this._hud.set_size(width, height);
+        this._quickActionsCard.set_width(Math.min(320, Math.max(240, width * 0.25)));
     }
 
     _connectCardAction(card, action) {
@@ -325,6 +464,8 @@ export default class NatsHudExtension extends Extension {
             }
             const networkScale = Math.max(1024, ...this._networkHistory);
             this._networkSparkline.update(this._networkHistory, networkScale);
+            this._activityNetworkSparkline.update(this._networkHistory, networkScale);
+            this._activityCpuSparkline.update(this._cpuHistory);
 
             this._storageValue.update(formatPercent(storage.usagePercent));
             this._storageProgress.update(
@@ -355,6 +496,11 @@ export default class NatsHudExtension extends Extension {
             this._timer = null;
         }
 
+        if (this._monitorChangedId) {
+            Main.layoutManager.disconnect(this._monitorChangedId);
+            this._monitorChangedId = null;
+        }
+
         if (this._hud) {
             this._hud.destroy();
             this._hud = null;
@@ -383,5 +529,11 @@ export default class NatsHudExtension extends Extension {
         this._coreColumns = null;
         this._coreGrid = null;
         this._systemMetrics = null;
+        this._activityCpuSparkline = null;
+        this._activityNetworkSparkline = null;
+        this._activityCard = null;
+        this._quickActionsCard = null;
+        this._powerCard = null;
+        this._systemCard = null;
     }
 }
