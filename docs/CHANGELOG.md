@@ -1,5 +1,11 @@
 # Changelog
 
+## Preferences foundation
+
+- Added persistent GSettings controls for card opacity, refresh interval, and dashboard sections.
+- Added an Adwaita Preferences window with Appearance, Telemetry, and Interface sections.
+- Connected saved settings to live card visibility, opacity, and polling behavior.
+
 ## Full desktop HUD layout
 
 - Distributed telemetry cards across a responsive primary-monitor layout below the GNOME panel.

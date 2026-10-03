@@ -42,3 +42,9 @@
 - Use `Main.layoutManager.primaryMonitor` and its origin and dimensions to size and place a desktop layer, then reposition it when monitors change. Monitor-relative geometry handles non-zero monitor origins and changing display sizes better than fixed coordinates.
 - The background group stacks the HUD behind normal application windows. Keep the root actor non-reactive so it does not intercept desktop input; enable interaction only on actors with real actions.
 - Root transparency and card transparency are separate choices: a transparent root leaves the wallpaper unobstructed across the canvas, while each card uses its own translucent background to retain readable text and glass depth.
+
+## Preferences and GSettings
+
+- A GSettings schema declares typed keys, defaults, and valid ranges. Compiling the schema makes those keys available to the extension; settings values are stored persistently by the desktop rather than in extension-owned config files.
+- `Extension.getSettings()` opens the schema named in extension metadata. Preferences widgets write values through Gio.Settings, so choices survive extension restarts and logins.
+- A `changed` signal lets the running extension apply visibility and opacity changes immediately, or restart its GLib timeout when the update interval changes. Disconnect the listener during `disable()` so it cannot retain the extension.

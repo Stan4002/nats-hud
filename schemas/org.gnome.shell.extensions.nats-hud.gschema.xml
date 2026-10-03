@@ -1,0 +1,48 @@
+<schemalist>
+  <schema id="org.gnome.shell.extensions.nats-hud" path="/org/gnome/shell/extensions/nats-hud/">
+    <key name="card-opacity" type="d">
+      <default>0.52</default>
+      <range min="0.20" max="0.90"/>
+      <summary>Card opacity</summary>
+      <description>Opacity of the HUD glass cards.</description>
+    </key>
+    <key name="update-interval" type="i">
+      <default>1</default>
+      <range min="1" max="10"/>
+      <summary>Update interval</summary>
+      <description>Seconds between telemetry updates.</description>
+    </key>
+    <key name="show-cpu" type="b">
+      <default>true</default>
+      <summary>Show CPU</summary>
+    </key>
+    <key name="show-memory" type="b">
+      <default>true</default>
+      <summary>Show memory</summary>
+    </key>
+    <key name="show-system" type="b">
+      <default>true</default>
+      <summary>Show system information</summary>
+    </key>
+    <key name="show-network" type="b">
+      <default>true</default>
+      <summary>Show network</summary>
+    </key>
+    <key name="show-storage" type="b">
+      <default>true</default>
+      <summary>Show storage</summary>
+    </key>
+    <key name="show-power" type="b">
+      <default>true</default>
+      <summary>Show power section</summary>
+    </key>
+    <key name="show-activity" type="b">
+      <default>true</default>
+      <summary>Show activity history</summary>
+    </key>
+    <key name="show-actions" type="b">
+      <default>true</default>
+      <summary>Show quick actions</summary>
+    </key>
+  </schema>
+</schemalist>

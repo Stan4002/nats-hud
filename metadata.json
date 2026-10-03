@@ -3,5 +3,6 @@
   "name": "NATS HUD",
   "description": "Interactive glass system-monitor desktop HUD",
   "shell-version": ["50"],
+  "settings-schema": "org.gnome.shell.extensions.nats-hud",
   "version": 1
 }
