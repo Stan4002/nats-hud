@@ -49,12 +49,17 @@ export default class NatsHudExtension extends Extension {
         this._buildHud(initialSnapshot.cpu.cores);
         this._monitorChangedId = Main.layoutManager.connect(
             'monitors-changed',
-            () => this._positionHud()
+            () => {
+                this._positionHud();
+                if (this._interactiveMode)
+                    this._positionInteractionPanel();
+            }
         );
         this._updateMetrics(initialSnapshot);
         this._applySettings();
         this._restartUpdateTimer();
         this._interactiveMode = false;
+        this._interactionPanel = null;
         this._escapeSignalId = null;
         Main.wm.addKeybinding(
             'toggle-interactive-mode',
@@ -439,50 +444,162 @@ export default class NatsHudExtension extends Extension {
 
     _toggleInteractiveMode() {
         if (this._interactiveMode)
-            this._exitInteractiveMode();
+            this._hideInteractionPanel();
         else
-            this._enterInteractiveMode();
+            this._showInteractionPanel();
     }
 
-    _enterInteractiveMode() {
-        if (!this._hud || this._interactiveMode)
+    _buildInteractionPanel() {
+        if (this._interactionPanel)
+            return this._interactionPanel;
+
+        const panel = new St.BoxLayout({
+            vertical: true,
+            reactive: true,
+            track_hover: true,
+            style_class: 'nats-interaction-panel',
+            x_expand: false,
+            y_expand: false
+        });
+
+        const header = new St.Label({
+            text: 'NATS // CONTROL',
+            style_class: 'nats-interaction-header'
+        });
+        panel.add_child(header);
+
+        const groups = [
+            {title: 'SYSTEM', buttons: ['CPU', 'MEMORY', 'NETWORK', 'STORAGE', 'SYSTEM', 'ACTIVITY']},
+            {title: 'ASSISTANT', buttons: ['COMMS']},
+            {title: 'QUICK', buttons: ['BTOP', 'SYSTEM MONITOR', 'FILES', 'TERMINAL']}
+        ];
+
+        for (const group of groups) {
+            const label = new St.Label({
+                text: group.title,
+                style_class: 'nats-interaction-group-title'
+            });
+            panel.add_child(label);
+
+            const grid = new St.BoxLayout({
+                style_class: 'nats-interaction-grid',
+                x_expand: true
+            });
+
+            const columnA = new St.BoxLayout({
+                vertical: true,
+                style_class: 'nats-interaction-column',
+                x_expand: true
+            });
+            const columnB = new St.BoxLayout({
+                vertical: true,
+                style_class: 'nats-interaction-column',
+                x_expand: true
+            });
+
+            group.buttons.forEach((buttonLabel, index) => {
+                const button = this._createInteractionButton(buttonLabel);
+                if (index % 2 === 0)
+                    columnA.add_child(button);
+                else
+                    columnB.add_child(button);
+            });
+
+            grid.add_child(columnA);
+            grid.add_child(columnB);
+            panel.add_child(grid);
+        }
+
+        const closeButton = new St.Button({
+            label: '×',
+            style_class: 'nats-interaction-close',
+            can_focus: true
+        });
+        closeButton.connect('clicked', () => this._hideInteractionPanel());
+        panel.add_child(closeButton);
+
+        this._interactionPanel = panel;
+        return panel;
+    }
+
+    _createInteractionButton(label) {
+        const button = new St.Button({
+            label,
+            style_class: 'nats-interaction-button',
+            x_expand: true,
+            can_focus: true
+        });
+
+        button.connect('clicked', () => {
+            if (label === 'BTOP')
+                openBtop();
+            else if (label === 'SYSTEM MONITOR')
+                openSystemMonitor();
+            else if (label === 'FILES')
+                openFiles();
+            else if (label === 'TERMINAL')
+                openTerminal();
+            else if (label === 'COMMS')
+                log('NATS HUD: requested section COMMS');
+            else
+                log(`NATS HUD: requested section ${label}`);
+        });
+
+        return button;
+    }
+
+    _positionInteractionPanel() {
+        if (!this._interactionPanel)
             return;
 
-        const parent = this._hud.get_parent();
-        if (parent)
-            parent.remove_child(this._hud);
-        Main.uiGroup.add_child(this._hud);
-        this._hud.reactive = true;
-        this._hud.track_hover = true;
+        const monitor = Main.layoutManager.primaryMonitor;
+        if (!monitor)
+            return;
+
+        const panelWidth = 360;
+        const panelHeight = 320;
+        const x = monitor.x + Math.max(20, monitor.width - panelWidth - 22);
+        const y = monitor.y + Math.max(Main.panel.height + 22, 90);
+
+        this._interactionPanel.set_position(x, y);
+        this._interactionPanel.set_size(panelWidth, panelHeight);
+    }
+
+    _showInteractionPanel() {
+        if (this._interactiveMode)
+            return;
+
+        this._buildInteractionPanel();
+        if (!this._interactionPanel.get_parent())
+            Main.uiGroup.add_child(this._interactionPanel);
+        this._positionInteractionPanel();
         this._interactiveMode = true;
+
         this._escapeSignalId = global.stage.connect('captured-event', (_stage, event) => {
             if (event.type() !== Clutter.EventType.KEY_PRESS ||
                 event.get_key_symbol() !== Clutter.KEY_Escape)
                 return Clutter.EVENT_PROPAGATE;
 
-            this._exitInteractiveMode();
+            this._hideInteractionPanel();
             return Clutter.EVENT_STOP;
         });
         log('NATS HUD: entered interactive mode');
     }
 
-    _exitInteractiveMode() {
-        if (!this._hud || !this._interactiveMode)
-            return;
-
+    _hideInteractionPanel() {
         if (this._escapeSignalId) {
             global.stage.disconnect(this._escapeSignalId);
             this._escapeSignalId = null;
         }
 
-        const parent = this._hud.get_parent();
-        if (parent)
-            parent.remove_child(this._hud);
-        Main.layoutManager._backgroundGroup.add_child(this._hud);
-        this._hud.reactive = false;
-        this._hud.track_hover = false;
+        if (this._interactionPanel) {
+            const parent = this._interactionPanel.get_parent();
+            if (parent)
+                parent.remove_child(this._interactionPanel);
+            this._interactionPanel.hide();
+        }
+
         this._interactiveMode = false;
-        this._positionHud();
         log('NATS HUD: exited interactive mode');
     }
 
@@ -620,6 +737,13 @@ export default class NatsHudExtension extends Extension {
         if (this._escapeSignalId) {
             global.stage.disconnect(this._escapeSignalId);
             this._escapeSignalId = null;
+        }
+        if (this._interactionPanel) {
+            const parent = this._interactionPanel.get_parent();
+            if (parent)
+                parent.remove_child(this._interactionPanel);
+            this._interactionPanel.destroy();
+            this._interactionPanel = null;
         }
         this._interactiveMode = false;
 

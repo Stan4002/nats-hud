@@ -6,6 +6,74 @@
     spacing: 12px;
 }
 
+.nats-interaction-panel {
+    background-color: rgba(8, 14, 20, 0.80);
+    border: 1px solid rgba(146, 180, 196, 0.18);
+    border-radius: 18px;
+    padding: 16px 14px 12px;
+    spacing: 10px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+}
+
+.nats-interaction-header {
+    color: #e6f0f4;
+    font-family: "FiraCode Nerd Font";
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.nats-interaction-group-title {
+    color: #97aab5;
+    font-family: "FiraCode Nerd Font";
+    font-size: 8px;
+    font-weight: bold;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 8px;
+}
+
+.nats-interaction-grid {
+    spacing: 8px;
+}
+
+.nats-interaction-column {
+    spacing: 8px;
+    width: 50%;
+}
+
+.nats-interaction-button,
+.nats-interaction-close {
+    padding: 8px 9px;
+    background-color: rgba(226, 237, 244, 0.06);
+    border: 1px solid rgba(226, 237, 244, 0.12);
+    border-radius: 10px;
+    color: #dfe9ee;
+    font-family: "FiraCode Nerd Font";
+    font-size: 9px;
+    font-weight: bold;
+    text-align: center;
+    transition-duration: 140ms;
+}
+
+.nats-interaction-button:hover,
+.nats-interaction-close:hover,
+.nats-interaction-button:focus,
+.nats-interaction-close:focus {
+    background-color: rgba(155, 207, 219, 0.15);
+    border-color: rgba(155, 207, 219, 0.32);
+    color: #f4fafb;
+}
+
+.nats-interaction-close {
+    margin-top: 8px;
+    width: 40px;
+    align-self: end;
+    font-size: 18px;
+    padding: 4px 0;
+}
+
 .nats-top-row,
 .nats-middle-row,
 .nats-lower-row {
