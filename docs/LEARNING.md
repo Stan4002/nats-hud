@@ -48,3 +48,8 @@
 - A GSettings schema declares typed keys, defaults, and valid ranges. Compiling the schema makes those keys available to the extension; settings values are stored persistently by the desktop rather than in extension-owned config files.
 - `Extension.getSettings()` opens the schema named in extension metadata. Preferences widgets write values through Gio.Settings, so choices survive extension restarts and logins.
 - A `changed` signal lets the running extension apply visibility and opacity changes immediately, or restart its GLib timeout when the update interval changes. Disconnect the listener during `disable()` so it cannot retain the extension.
+
+## Focused Telemetry Cards
+
+- Keep a single focused-section state and reparent existing actors between row containers when changing focus; this preserves each actor's live data and avoids rebuilding telemetry widgets.
+- Stable row/column reflow is more predictable than animating actor geometry inside GNOME Shell's constrained monitor layout. Update expansion, widths, and style classes first; retain Clutter transitions for future use only when they can be tested without causing overlap or leaving monitor bounds.

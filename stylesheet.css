@@ -35,6 +35,64 @@
     max-width: 320px;
 }
 
+.nats-cpu-hit-target,
+.nats-cpu-hit-target:hover,
+.nats-cpu-hit-target:active,
+.nats-cpu-hit-target:focus {
+    padding: 0;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.nats-focus-sidebar {
+    spacing: 12px;
+}
+
+.nats-card-secondary {
+    min-height: 0;
+}
+
+.nats-card-secondary .nats-system-values {
+    spacing: 5px;
+}
+
+.nats-hud-focused .nats-top-row {
+    min-height: 320px;
+}
+
+.nats-hud-focused .nats-middle-row {
+    min-height: 150px;
+}
+
+.nats-hud-focused .nats-lower-row {
+    min-height: 150px;
+}
+
+.nats-card-focused {
+    border-color: rgba(118, 203, 220, 0.62);
+    background-color: rgba(30, 42, 54, 0.72);
+}
+
+.nats-cpu-focused .nats-metric-main {
+    font-size: 34px;
+}
+
+.nats-cpu-focused .nats-sparkline {
+    font-size: 21px;
+}
+
+.nats-cpu-focused .nats-progress-label,
+.nats-cpu-focused .nats-progress-value {
+    font-size: 9px;
+}
+
+.nats-cpu-focused .nats-core-metric .nats-progress-track,
+.nats-cpu-focused .nats-core-metric .nats-progress-fill {
+    height: 5px;
+    border-radius: 3px;
+}
+
 .nats-actions-grid,
 .nats-action-column {
     spacing: 9px;

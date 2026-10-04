@@ -34,6 +34,7 @@ export default class NatsHudExtension extends Extension {
         if (this._hud)
             return;
 
+        this._focusedSection = null;
         this._settings = this.getSettings();
         this._settingsChangedId = this._settings.connect('changed', (_settings, key) => {
             this._applySettings();
@@ -62,7 +63,7 @@ export default class NatsHudExtension extends Extension {
             track_hover: false
         });
 
-        const metricsRow = new St.BoxLayout({
+        this._topRow = new St.BoxLayout({
             style_class: 'nats-top-row',
             x_expand: true,
             y_expand: true
@@ -71,10 +72,10 @@ export default class NatsHudExtension extends Extension {
         this._cpuCard = new GlassCard({
             title: 'CPU',
             subtitle: 'Live processor load',
-            iconText: '◉'
+            iconText: '◉',
+            reactive: false
         });
         this._cpuCard.add_style_class_name('nats-cpu-card');
-        this._connectCardOpacity(this._cpuCard);
         this._cpuCard.x_expand = true;
         this._cpuCard.y_expand = true;
         this._cpuCard.body.y_expand = true;
@@ -110,8 +111,7 @@ export default class NatsHudExtension extends Extension {
         this._ensureCoreMetrics(initialCores);
         this._coreGrid.y_expand = true;
         this._cpuCard.body.add_child(this._coreGrid);
-        this._connectCardAction(this._cpuCard, openBtop);
-        metricsRow.add_child(this._cpuCard);
+        this._topRow.add_child(this._cpuCard);
 
         this._memoryCard = new GlassCard({
             title: 'MEMORY',
@@ -135,7 +135,7 @@ export default class NatsHudExtension extends Extension {
         this._memoryCard.body.add_child(this._memoryValue);
         this._memoryCard.body.add_child(this._memoryProgress);
         this._connectCardAction(this._memoryCard, openSystemMonitor);
-        metricsRow.add_child(this._memoryCard);
+        this._topRow.add_child(this._memoryCard);
 
         this._systemCard = new GlassCard({
             title: 'SYSTEM',
@@ -165,10 +165,15 @@ export default class NatsHudExtension extends Extension {
             systemValues.add_child(metric);
         }
         this._systemCard.body.add_child(systemValues);
-        metricsRow.add_child(this._systemCard);
-        this._hud.add_child(metricsRow);
+        this._topRow.add_child(this._systemCard);
 
-        const dataRow = new St.BoxLayout({
+        this._focusSidebar = new St.BoxLayout({
+            vertical: true,
+            style_class: 'nats-focus-sidebar',
+            y_expand: true
+        });
+
+        this._middleRow = new St.BoxLayout({
             style_class: 'nats-middle-row',
             x_expand: true,
             y_expand: true
@@ -204,7 +209,7 @@ export default class NatsHudExtension extends Extension {
         this._networkCard.body.add_child(networkValues);
         this._networkCard.body.add_child(this._networkInterface);
         this._networkCard.body.add_child(this._networkSparkline);
-        dataRow.add_child(this._networkCard);
+        this._middleRow.add_child(this._networkCard);
 
         this._storageCard = new GlassCard({
             title: 'STORAGE',
@@ -233,7 +238,7 @@ export default class NatsHudExtension extends Extension {
         this._storageCard.body.add_child(this._storageValue);
         this._storageCard.body.add_child(this._storageProgress);
         this._storageCard.body.add_child(this._storageFree);
-        dataRow.add_child(this._storageCard);
+        this._middleRow.add_child(this._storageCard);
 
         this._powerCard = new GlassCard({
             title: 'POWER',
@@ -251,10 +256,9 @@ export default class NatsHudExtension extends Extension {
             x_expand: true,
             y_align: Clutter.ActorAlign.CENTER
         }));
-        dataRow.add_child(this._powerCard);
-        this._hud.add_child(dataRow);
+        this._middleRow.add_child(this._powerCard);
 
-        const lowerRow = new St.BoxLayout({
+        this._lowerRow = new St.BoxLayout({
             style_class: 'nats-lower-row',
             x_expand: true,
             y_expand: true
@@ -303,7 +307,7 @@ export default class NatsHudExtension extends Extension {
         activityValues.add_child(cpuHistory);
         activityValues.add_child(networkActivity);
         this._activityCard.body.add_child(activityValues);
-        lowerRow.add_child(this._activityCard);
+        this._lowerRow.add_child(this._activityCard);
 
         this._quickActionsCard = new GlassCard({
             title: 'QUICK ACTIONS',
@@ -336,19 +340,128 @@ export default class NatsHudExtension extends Extension {
         actionsGrid.add_child(primaryActions);
         actionsGrid.add_child(secondaryActions);
         this._quickActionsCard.body.add_child(actionsGrid);
-        lowerRow.add_child(this._quickActionsCard);
-        this._hud.add_child(lowerRow);
+        this._lowerRow.add_child(this._quickActionsCard);
+
+        this._hud.add_child(this._topRow);
+        this._hud.add_child(this._middleRow);
+        this._hud.add_child(this._lowerRow);
 
         Main.layoutManager._backgroundGroup.add_child(this._hud);
+        this._createCpuHitTarget();
         this._positionHud();
     }
 
-    _connectCardOpacity(card) {
-        card.connect('enter-event', () => {
+    _createCpuHitTarget() {
+        this._cpuHitTarget = new St.Button({
+            style_class: 'nats-cpu-hit-target',
+            reactive: true,
+            track_hover: true,
+            can_focus: true,
+            visible: this._settings.get_boolean('show-cpu')
+        });
+        global.window_group.add_child(this._cpuHitTarget);
+        this._stackCpuHitTarget();
+        log('NATS HUD: CPU hit-target attached to window_group above background');
+
+        this._cpuVisualAllocationSignalId = this._cpuCard.connect(
+            'notify::allocation',
+            () => {
+                this._logActorAllocation(this._cpuCard, 'visual CPU');
+                this._syncCpuHitTarget();
+            }
+        );
+        this._cpuHitTargetSignalIds = [];
+        this._cpuHitTargetSignalIds.push(
+            this._cpuHitTarget.connect('notify::allocation', () => {
+                this._logActorAllocation(this._cpuHitTarget, 'CPU hit-target');
+            })
+        );
+        this._restackedSignalId = global.display.connect('restacked', () => {
+            this._stackCpuHitTarget();
+        });
+
+        this._cpuHitTargetSignalIds.push(
+            this._cpuHitTarget.connect('enter-event', () => {
+                this._setCardOpacity(this._cpuCard, true);
+                return Clutter.EVENT_PROPAGATE;
+            })
+        );
+        this._cpuHitTargetSignalIds.push(
+            this._cpuHitTarget.connect('leave-event', () => {
+                this._setCardOpacity(this._cpuCard, false);
+                return Clutter.EVENT_PROPAGATE;
+            })
+        );
+        this._connectCpuFocus();
+        this._syncCpuHitTarget();
+        this._cpuHitSyncSourceId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
+            this._cpuHitSyncSourceId = null;
+            this._syncCpuHitTarget();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _stackCpuHitTarget() {
+        const windowGroup = global.window_group;
+        const backgroundGroup = Main.layoutManager._backgroundGroup;
+
+        if (this._cpuHitTarget.get_parent() !== windowGroup)
+            windowGroup.add_child(this._cpuHitTarget);
+
+        windowGroup.set_child_above_sibling(this._cpuHitTarget, backgroundGroup);
+    }
+
+    _syncCpuHitTarget() {
+        if (!this._cpuCard || !this._cpuHitTarget)
+            return;
+
+        this._logActorAllocation(this._cpuCard, 'visual CPU');
+        const [stageX, stageY] = this._cpuCard.get_transformed_position();
+        const [stageWidth, stageHeight] = this._cpuCard.get_transformed_size();
+        if (stageWidth <= 0 || stageHeight <= 0) {
+            log(`NATS HUD: CPU hit-target waiting for visual allocation (${stageWidth}x${stageHeight})`);
+            this._cpuHitTarget.hide();
+            return;
+        }
+
+        const [startValid, localX, localY] = global.window_group.transform_stage_point(
+            stageX,
+            stageY
+        );
+        const [endValid, localRight, localBottom] = global.window_group.transform_stage_point(
+            stageX + stageWidth,
+            stageY + stageHeight
+        );
+        if (!startValid || !endValid)
+            return;
+
+        this._cpuHitTarget.set_position(localX, localY);
+        this._cpuHitTarget.set_size(localRight - localX, localBottom - localY);
+        this._cpuHitTarget.visible = this._settings.get_boolean('show-cpu');
+        this._logActorAllocation(this._cpuHitTarget, 'CPU hit-target');
+        this._stackCpuHitTarget();
+    }
+
+    _logActorAllocation(actor, label) {
+        const [x, y] = actor.get_transformed_position();
+        const [width, height] = actor.get_transformed_size();
+        const allocation = [x, y, width, height].map(value => Math.round(value)).join(',');
+        const key = label === 'visual CPU' ? '_lastVisualCpuAllocation' : '_lastHitTargetAllocation';
+
+        if (this[key] === allocation)
+            return;
+
+        this[key] = allocation;
+        log(`NATS HUD: ${label} allocation x=${Math.round(x)} y=${Math.round(y)} ` +
+            `width=${Math.round(width)} height=${Math.round(height)}`);
+    }
+
+    _connectCardOpacity(card, eventActor = card) {
+        eventActor.connect('enter-event', () => {
             this._setCardOpacity(card, true);
             return Clutter.EVENT_PROPAGATE;
         });
-        card.connect('leave-event', () => {
+        eventActor.connect('leave-event', () => {
             this._setCardOpacity(card, false);
             return Clutter.EVENT_PROPAGATE;
         });
@@ -358,7 +471,10 @@ export default class NatsHudExtension extends Extension {
         if (!card)
             return;
 
-        const opacity = Math.min(0.9, this._cardOpacity + (hovered ? 0.06 : 0));
+        const focusBoost = card === this._cpuCard && this._focusedSection === 'cpu'
+            ? 0.04
+            : 0;
+        const opacity = Math.min(0.9, this._cardOpacity + focusBoost + (hovered ? 0.06 : 0));
         card.set_style(`background-color: rgba(24, 32, 43, ${opacity});`);
     }
 
@@ -379,7 +495,6 @@ export default class NatsHudExtension extends Extension {
         }
 
         const visibilitySettings = [
-            ['show-cpu', this._cpuCard],
             ['show-memory', this._memoryCard],
             ['show-system', this._systemCard],
             ['show-network', this._networkCard],
@@ -391,6 +506,16 @@ export default class NatsHudExtension extends Extension {
 
         for (const [key, actor] of visibilitySettings)
             actor.visible = this._settings.get_boolean(key);
+
+        const showCpu = this._settings.get_boolean('show-cpu');
+        this._cpuCard.visible = showCpu;
+        this._cpuHitTarget.visible = showCpu;
+
+        if (!showCpu && this._focusedSection === 'cpu')
+            this._focusedSection = null;
+
+        this._applyFocusLayout();
+        this._syncCpuHitTarget();
     }
 
     _restartUpdateTimer() {
@@ -424,6 +549,119 @@ export default class NatsHudExtension extends Extension {
         this._hud.set_position(monitor.x + sideMargin, monitor.y + topInset);
         this._hud.set_size(width, height);
         this._quickActionsCard.set_width(Math.min(320, Math.max(240, width * 0.25)));
+        this._syncCpuHitTarget();
+        if (this._focusedSection)
+            this._applyFocusLayout();
+    }
+
+    _connectCpuFocus() {
+        this._cpuHitTargetSignalIds.push(
+            this._cpuHitTarget.connect('button-press-event', () => {
+                log('NATS HUD: CPU pointer press received');
+                return Clutter.EVENT_PROPAGATE;
+            })
+        );
+        this._cpuHitTargetSignalIds.push(
+            this._cpuHitTarget.connect('clicked', () => {
+                log('NATS HUD: CPU interaction received');
+                this._toggleFocus('cpu');
+            })
+        );
+        this._cpuHitTargetSignalIds.push(
+            this._cpuHitTarget.connect('key-press-event', (_actor, event) => {
+            const key = event.get_key_symbol();
+            if (key !== Clutter.KEY_Return &&
+                key !== Clutter.KEY_KP_Enter &&
+                key !== Clutter.KEY_space)
+                return Clutter.EVENT_PROPAGATE;
+
+            log('NATS HUD: CPU keyboard interaction received');
+                return Clutter.EVENT_PROPAGATE;
+            })
+        );
+    }
+
+    _toggleFocus(section) {
+        if (this._focusedSection === section) {
+            this._clearFocus();
+            return;
+        }
+
+        this._focusSection(section);
+    }
+
+    _focusSection(section) {
+        if (section !== 'cpu' || !this._settings.get_boolean('show-cpu'))
+            return;
+
+        this._focusedSection = section;
+        log('NATS HUD: CPU focus entered');
+        this._applyFocusLayout();
+    }
+
+    _clearFocus() {
+        this._focusedSection = null;
+        log('NATS HUD: CPU focus collapsed');
+        this._applyFocusLayout();
+    }
+
+    _applyFocusLayout() {
+        if (!this._topRow)
+            return;
+
+        const focused = this._focusedSection === 'cpu';
+        if (focused) {
+            if (this._memoryCard.get_parent() === this._topRow)
+                this._topRow.remove_child(this._memoryCard);
+            if (this._systemCard.get_parent() === this._topRow)
+                this._topRow.remove_child(this._systemCard);
+            if (this._memoryCard.get_parent() !== this._focusSidebar)
+                this._focusSidebar.add_child(this._memoryCard);
+            if (this._systemCard.get_parent() !== this._focusSidebar)
+                this._focusSidebar.add_child(this._systemCard);
+            if (this._focusSidebar.get_parent() !== this._topRow)
+                this._topRow.add_child(this._focusSidebar);
+
+            this._focusSidebar.x_expand = false;
+            this._focusSidebar.y_expand = true;
+            this._memoryCard.add_style_class_name('nats-card-secondary');
+            this._systemCard.add_style_class_name('nats-card-secondary');
+            this._cpuCard.add_style_class_name('nats-card-focused');
+            this._cpuCard.add_style_class_name('nats-cpu-focused');
+            this._topRow.add_style_class_name('nats-row-focused');
+            this._hud.add_style_class_name('nats-hud-focused');
+            this._topRow.y_expand = true;
+            this._middleRow.y_expand = false;
+            this._lowerRow.y_expand = false;
+            this._focusSidebar.set_width(Math.min(
+                320,
+                Math.max(230, this._hud.get_width() * 0.24)
+            ));
+        } else {
+            if (this._focusSidebar.get_parent() === this._topRow)
+                this._topRow.remove_child(this._focusSidebar);
+            if (this._memoryCard.get_parent() === this._focusSidebar)
+                this._focusSidebar.remove_child(this._memoryCard);
+            if (this._systemCard.get_parent() === this._focusSidebar)
+                this._focusSidebar.remove_child(this._systemCard);
+            if (this._memoryCard.get_parent() !== this._topRow)
+                this._topRow.add_child(this._memoryCard);
+            if (this._systemCard.get_parent() !== this._topRow)
+                this._topRow.add_child(this._systemCard);
+
+            this._memoryCard.remove_style_class_name('nats-card-secondary');
+            this._systemCard.remove_style_class_name('nats-card-secondary');
+            this._cpuCard.remove_style_class_name('nats-card-focused');
+            this._cpuCard.remove_style_class_name('nats-cpu-focused');
+            this._topRow.remove_style_class_name('nats-row-focused');
+            this._hud.remove_style_class_name('nats-hud-focused');
+            this._topRow.y_expand = true;
+            this._middleRow.y_expand = true;
+            this._lowerRow.y_expand = true;
+            this._focusSidebar.set_width(0);
+        }
+
+        this._syncCpuHitTarget();
     }
 
     _connectCardAction(card, action) {
@@ -560,6 +798,11 @@ export default class NatsHudExtension extends Extension {
             this._timer = null;
         }
 
+        if (this._cpuHitSyncSourceId !== null && this._cpuHitSyncSourceId !== undefined) {
+            GLib.source_remove(this._cpuHitSyncSourceId);
+            this._cpuHitSyncSourceId = null;
+        }
+
         if (this._monitorChangedId) {
             Main.layoutManager.disconnect(this._monitorChangedId);
             this._monitorChangedId = null;
@@ -569,6 +812,28 @@ export default class NatsHudExtension extends Extension {
             this._settings.disconnect(this._settingsChangedId);
             this._settingsChangedId = null;
         }
+
+        if (this._cpuCard && this._cpuVisualAllocationSignalId) {
+            this._cpuCard.disconnect(this._cpuVisualAllocationSignalId);
+            this._cpuVisualAllocationSignalId = null;
+        }
+
+        if (this._cpuHitTarget && this._cpuHitTargetSignalIds) {
+            for (const signalId of this._cpuHitTargetSignalIds)
+                this._cpuHitTarget.disconnect(signalId);
+        }
+        this._cpuHitTargetSignalIds = [];
+
+        if (this._restackedSignalId) {
+            global.display.disconnect(this._restackedSignalId);
+            this._restackedSignalId = null;
+        }
+
+        if (this._cpuHitTarget) {
+            this._cpuHitTarget.destroy();
+            this._cpuHitTarget = null;
+        }
+        this._focusedSection = null;
 
         if (this._hud) {
             this._hud.destroy();
@@ -604,6 +869,10 @@ export default class NatsHudExtension extends Extension {
         this._quickActionsCard = null;
         this._powerCard = null;
         this._systemCard = null;
+        this._topRow = null;
+        this._middleRow = null;
+        this._lowerRow = null;
+        this._focusSidebar = null;
         this._settings = null;
     }
 }

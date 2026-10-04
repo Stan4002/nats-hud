@@ -1,5 +1,11 @@
 # Changelog
 
+## CPU focused-card interaction
+
+- Added a toggleable CPU focus state that expands the CPU card and moves memory/system cards into a secondary sidebar.
+- Preserved the other telemetry rows and Quick Actions while focus is active.
+- Reused existing actors and kept live updates running during focus changes.
+
 ## Preferences foundation
 
 - Added persistent GSettings controls for card opacity, refresh interval, and dashboard sections.
