@@ -44,5 +44,10 @@
       <default>true</default>
       <summary>Show quick actions</summary>
     </key>
+    <key name="toggle-interactive-mode" type="as">
+      <default>['&lt;Super&gt;&lt;Shift&gt;n']</default>
+      <summary>Toggle interactive mode</summary>
+      <description>Keyboard shortcut used to bring NATS HUD into interactive mode.</description>
+    </key>
   </schema>
 </schemalist>

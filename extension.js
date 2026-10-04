@@ -1,6 +1,8 @@
 import St from 'gi://St';
 import GLib from 'gi://GLib';
 import Clutter from 'gi://Clutter';
+import Meta from 'gi://Meta';
+import Shell from 'gi://Shell';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -52,6 +54,15 @@ export default class NatsHudExtension extends Extension {
         this._updateMetrics(initialSnapshot);
         this._applySettings();
         this._restartUpdateTimer();
+        this._interactiveMode = false;
+        this._escapeSignalId = null;
+        Main.wm.addKeybinding(
+            'toggle-interactive-mode',
+            this._settings,
+            Meta.KeyBindingFlags.NONE,
+            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
+            () => this._toggleInteractiveMode()
+        );
     }
 
     _buildHud(initialCores) {
@@ -426,6 +437,55 @@ export default class NatsHudExtension extends Extension {
         this._quickActionsCard.set_width(Math.min(320, Math.max(240, width * 0.25)));
     }
 
+    _toggleInteractiveMode() {
+        if (this._interactiveMode)
+            this._exitInteractiveMode();
+        else
+            this._enterInteractiveMode();
+    }
+
+    _enterInteractiveMode() {
+        if (!this._hud || this._interactiveMode)
+            return;
+
+        const parent = this._hud.get_parent();
+        if (parent)
+            parent.remove_child(this._hud);
+        Main.uiGroup.add_child(this._hud);
+        this._hud.reactive = true;
+        this._hud.track_hover = true;
+        this._interactiveMode = true;
+        this._escapeSignalId = global.stage.connect('captured-event', (_stage, event) => {
+            if (event.type() !== Clutter.EventType.KEY_PRESS ||
+                event.get_key_symbol() !== Clutter.KEY_Escape)
+                return Clutter.EVENT_PROPAGATE;
+
+            this._exitInteractiveMode();
+            return Clutter.EVENT_STOP;
+        });
+        log('NATS HUD: entered interactive mode');
+    }
+
+    _exitInteractiveMode() {
+        if (!this._hud || !this._interactiveMode)
+            return;
+
+        if (this._escapeSignalId) {
+            global.stage.disconnect(this._escapeSignalId);
+            this._escapeSignalId = null;
+        }
+
+        const parent = this._hud.get_parent();
+        if (parent)
+            parent.remove_child(this._hud);
+        Main.layoutManager._backgroundGroup.add_child(this._hud);
+        this._hud.reactive = false;
+        this._hud.track_hover = false;
+        this._interactiveMode = false;
+        this._positionHud();
+        log('NATS HUD: exited interactive mode');
+    }
+
     _connectCardAction(card, action) {
         card.connect('button-press-event', () => {
             action();
@@ -555,6 +615,14 @@ export default class NatsHudExtension extends Extension {
     }
 
     disable() {
+        Main.wm.removeKeybinding('toggle-interactive-mode');
+
+        if (this._escapeSignalId) {
+            global.stage.disconnect(this._escapeSignalId);
+            this._escapeSignalId = null;
+        }
+        this._interactiveMode = false;
+
         if (this._timer !== null && this._timer !== undefined) {
             GLib.source_remove(this._timer);
             this._timer = null;
