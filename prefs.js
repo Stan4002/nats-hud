@@ -9,7 +9,6 @@ const VISIBILITY_SETTINGS = [
     ['show-system', 'System'],
     ['show-network', 'Network'],
     ['show-storage', 'Storage'],
-    ['show-power', 'Power'],
     ['show-activity', 'Activity'],
     ['show-actions', 'Quick actions']
 ];
@@ -60,7 +59,7 @@ export default class NatsHudPreferences extends ExtensionPreferences {
         });
         telemetryGroup.add(intervalRow);
 
-        for (const [key, title] of VISIBILITY_SETTINGS.slice(0, 7))
+        for (const [key, title] of VISIBILITY_SETTINGS.slice(0, 6))
             telemetryGroup.add(this._createSwitchRow(settings, key, title));
         page.add(telemetryGroup);
 

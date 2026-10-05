@@ -7,31 +7,246 @@
 }
 
 .nats-interaction-panel {
-    background-color: rgba(8, 14, 20, 0.80);
-    border: 1px solid rgba(146, 180, 196, 0.18);
-    border-radius: 18px;
-    padding: 16px 14px 12px;
-    spacing: 10px;
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+    background-color: rgba(20, 28, 37, 0.70);
+    border: 1px solid rgba(175, 197, 208, 0.16);
+    border-radius: 20px;
+    padding: 15px 14px 13px;
+    spacing: 9px;
+    box-shadow: 0 16px 28px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(181, 202, 214, 0.06);
 }
 
 .nats-interaction-header {
-    color: #e6f0f4;
+    color: #ecf4f6;
+    font-family: "FiraCode Nerd Font";
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+
+.nats-ambient-now {
+    spacing: 2px;
+    margin-bottom: 4px;
+}
+
+.nats-ambient-date-value {
+    color: #edf5f7;
     font-family: "FiraCode Nerd Font";
     font-size: 11px;
     font-weight: bold;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
 .nats-interaction-group-title {
-    color: #97aab5;
+    color: #96aab4;
     font-family: "FiraCode Nerd Font";
     font-size: 8px;
     font-weight: bold;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    margin-top: 8px;
+    margin-top: 10px;
+    padding-left: 2px;
+}
+
+.nats-interaction-content,
+.nats-interaction-footer,
+.nats-interaction-button-row {
+    spacing: 8px;
+}
+
+.nats-interaction-toolbar {
+    spacing: 8px;
+}
+
+.nats-interaction-section {
+    spacing: 8px;
+    padding: 4px 0;
+}
+
+.nats-assistant-page {
+    spacing: 4px;
+}
+
+.nats-assistant-page .nats-interaction-group-title {
+    margin-top: 3px;
+}
+
+.nats-assistant-page .nats-interaction-button {
+    padding: 4px 5px;
+}
+
+.nats-calendar {
+    spacing: 5px;
+    padding: 7px 8px;
+    background-color: rgba(226, 237, 244, 0.035);
+    border: 1px solid rgba(226, 237, 244, 0.08);
+    border-radius: 12px;
+}
+
+.nats-calendar-header {
+    padding-bottom: 3px;
+}
+
+.nats-calendar-month {
+    color: #d9e7eb;
+    font-family: "FiraCode Nerd Font";
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+}
+
+.nats-calendar-weekdays,
+.nats-calendar-row {
+    spacing: 2px;
+}
+
+.nats-calendar-weekday {
+    color: #81959f;
+    font-family: "FiraCode Nerd Font";
+    font-size: 8px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.nats-calendar-grid {
+    spacing: 2px;
+}
+
+.nats-calendar-day {
+    min-height: 27px;
+    padding: 2px 0;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    color: #d2dde1;
+}
+
+.nats-calendar-day-number {
+    color: inherit;
+    font-family: "FiraCode Nerd Font";
+    font-size: 10px;
+    text-align: center;
+}
+
+.nats-calendar-today {
+    background-color: rgba(115, 194, 211, 0.17);
+    border-color: rgba(139, 211, 223, 0.68);
+    color: #9de5ef;
+    font-weight: bold;
+}
+
+.nats-calendar-event-dot {
+    color: #8bd3df;
+    font-size: 5px;
+    text-align: center;
+    margin-top: -3px;
+}
+
+.nats-page-nav {
+    spacing: 6px;
+}
+
+.nats-page-arrow {
+    min-width: 24px;
+    min-height: 24px;
+    padding: 0;
+    background-color: transparent;
+    border: 1px solid rgba(226, 237, 244, 0.10);
+    border-radius: 8px;
+    color: #aebec5;
+    font-family: "FiraCode Nerd Font";
+    font-size: 17px;
+}
+
+.nats-page-arrow:hover,
+.nats-page-arrow:focus {
+    background-color: rgba(122, 185, 201, 0.10);
+    border-color: rgba(122, 185, 201, 0.24);
+    color: #e8f4f6;
+}
+
+.nats-assistant-task-list {
+    min-height: 48px;
+    max-height: 360px;
+}
+
+.nats-assistant-task-list-content {
+    spacing: 6px;
+}
+
+.nats-page-indicators {
+    spacing: 3px;
+}
+
+.nats-page-dot {
+    min-width: 20px;
+    min-height: 24px;
+    padding: 0;
+    border: none;
+    background-color: transparent;
+    color: rgba(210, 223, 229, 0.42);
+    font-size: 7px;
+}
+
+.nats-page-dot-active {
+    color: #8bd3df;
+}
+
+.nats-interaction-stat-row,
+.nats-interaction-core-row {
+    spacing: 10px;
+    x_align: fill;
+}
+
+.nats-interaction-stat-label,
+.nats-interaction-core-label,
+.nats-interaction-section-label {
+    color: #98a9b4;
+    font-family: "FiraCode Nerd Font";
+    font-size: 8px;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.nats-interaction-stat-value,
+.nats-interaction-core-value {
+    color: #edf4f6;
+    font-family: "FiraCode Nerd Font";
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.nats-interaction-core-track {
+    height: 6px;
+    min-width: 60px;
+    border-radius: 4px;
+    background-color: rgba(226, 237, 244, 0.12);
+}
+
+.nats-interaction-core-fill {
+    height: 6px;
+    border-radius: 4px;
+    background-color: #84d0de;
+}
+
+.nats-interaction-sparkline {
+    color: #85c8d6;
+    font-family: "FiraCode Nerd Font";
+    font-size: 12px;
+    letter-spacing: 0.04em;
+}
+
+.nats-memory-bar {
+    height: 8px;
+    border-radius: 5px;
+    background-color: rgba(226, 237, 244, 0.12);
+}
+
+.nats-memory-bar-fill {
+    height: 8px;
+    border-radius: 5px;
+    background-color: #b5a0dc;
 }
 
 .nats-interaction-grid {
@@ -45,25 +260,198 @@
 
 .nats-interaction-button,
 .nats-interaction-close {
-    padding: 8px 9px;
-    background-color: rgba(226, 237, 244, 0.06);
+    padding: 6px 8px;
+    background-color: rgba(226, 237, 244, 0.05);
     border: 1px solid rgba(226, 237, 244, 0.12);
-    border-radius: 10px;
-    color: #dfe9ee;
+    border-radius: 11px;
+    color: #dde7ed;
     font-family: "FiraCode Nerd Font";
     font-size: 9px;
     font-weight: bold;
     text-align: center;
-    transition-duration: 140ms;
 }
 
 .nats-interaction-button:hover,
 .nats-interaction-close:hover,
 .nats-interaction-button:focus,
 .nats-interaction-close:focus {
-    background-color: rgba(155, 207, 219, 0.15);
-    border-color: rgba(155, 207, 219, 0.32);
+    background-color: rgba(122, 185, 201, 0.12);
+    border-color: rgba(122, 185, 201, 0.28);
     color: #f4fafb;
+}
+
+.nats-interaction-button:active,
+.nats-interaction-close:active {
+    background-color: rgba(122, 185, 201, 0.18);
+}
+
+.nats-interaction-back {
+    background-color: rgba(180, 192, 199, 0.06);
+    border-color: rgba(180, 192, 199, 0.12);
+    color: #d5dfe6;
+}
+
+.nats-interaction-primary {
+    background-color: rgba(117, 168, 190, 0.12);
+    border-color: rgba(158, 200, 214, 0.32);
+}
+
+.nats-ambient-card {
+    spacing: 8px;
+    padding: 12px;
+    background-color: rgba(24, 32, 43, 0.46);
+    border-color: rgba(190, 207, 219, 0.13);
+    border-radius: 18px;
+    min-height: 180px;
+}
+
+.nats-ambient-card .nats-card-header {
+    spacing: 8px;
+}
+
+.nats-ambient-card .nats-card-title {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+}
+
+.nats-ambient-card .nats-card-subtitle {
+    font-size: 8px;
+}
+
+.nats-ambient-time {
+    color: #e6f0f3;
+    font-family: "FiraCode Nerd Font";
+    font-size: 28px;
+    font-weight: bold;
+    letter-spacing: 0.04em;
+}
+
+.nats-ambient-date {
+    color: #9eafb8;
+    font-family: "FiraCode Nerd Font";
+    font-size: 8px;
+}
+
+.nats-ambient-section-title {
+    color: #8fa5af;
+    font-family: "FiraCode Nerd Font";
+    font-size: 7px;
+    font-weight: bold;
+    letter-spacing: 0.13em;
+}
+
+.nats-ambient-reminder-list {
+    spacing: 3px;
+}
+
+.nats-ambient-reminder {
+    color: #b5c4ca;
+    font-family: "FiraCode Nerd Font";
+    font-size: 8px;
+}
+
+.nats-ambient-more {
+    color: #89c7d1;
+    font-family: "FiraCode Nerd Font";
+    font-size: 7px;
+    margin-top: -2px;
+}
+
+.nats-ambient-calendar-heading {
+    margin-top: 3px;
+    padding-top: 6px;
+    border-top-width: 1px;
+    border-top-color: rgba(190, 207, 219, 0.12);
+}
+
+.nats-ambient-calendar {
+    spacing: 3px;
+}
+
+.nats-ambient-calendar-grid {
+    spacing: 1px;
+}
+
+.nats-ambient-calendar-row {
+    spacing: 1px;
+}
+
+.nats-ambient-weekday,
+.nats-ambient-calendar-day {
+    color: #899ba5;
+    font-family: "FiraCode Nerd Font";
+    font-size: 8px;
+    text-align: center;
+}
+
+.nats-ambient-calendar-day {
+    color: #c0cbd0;
+    padding: 1px 0 2px;
+}
+
+.nats-ambient-calendar-day-label {
+    color: inherit;
+    font-family: "FiraCode Nerd Font";
+    font-size: 8px;
+    text-align: center;
+}
+
+.nats-ambient-calendar-marker {
+    color: #8bd3df;
+    font-family: "FiraCode Nerd Font";
+    font-size: 8px;
+    text-align: center;
+    margin-top: -1px;
+}
+
+.nats-ambient-today {
+    color: #8bd3df;
+    font-weight: bold;
+    background-color: rgba(115, 194, 211, 0.15);
+    border-radius: 5px;
+}
+
+.nats-ambient-shortcut {
+    spacing: 2px;
+    margin-top: 2px;
+    padding-top: 6px;
+    border-top-width: 1px;
+    border-top-color: rgba(190, 207, 219, 0.10);
+}
+
+.nats-ambient-shortcut-label {
+    color: #82949e;
+    font-family: "FiraCode Nerd Font";
+    font-size: 7px;
+    letter-spacing: 0.06em;
+}
+
+.nats-ambient-shortcut-key {
+    color: #b7c7ce;
+    font-family: "FiraCode Nerd Font";
+    font-size: 8px;
+    font-weight: bold;
+}
+
+.nats-ambient-interactive {
+    spacing: 10px;
+    padding: 14px;
+    background-color: rgba(24, 32, 43, 0.58);
+    border-color: rgba(143, 202, 214, 0.20);
+}
+
+.nats-ambient-interactive .nats-ambient-time {
+    font-size: 32px;
+}
+
+.nats-ambient-interactive .nats-ambient-reminder-list,
+.nats-ambient-interactive .nats-ambient-calendar {
+    spacing: 5px;
+}
+
+.nats-ambient-interactive .nats-ambient-calendar-day,
+.nats-ambient-interactive .nats-ambient-weekday {
+    font-size: 9px;
 }
 
 .nats-interaction-close {
@@ -74,6 +462,30 @@
     padding: 4px 0;
 }
 
+.nats-acc-cpu {
+    color: #77d6eb;
+}
+
+.nats-acc-memory {
+    color: #bca7ed;
+}
+
+.nats-acc-network {
+    color: #7fcfe0;
+}
+
+.nats-acc-storage {
+    color: #e0b66b;
+}
+
+.nats-acc-system {
+    color: #d9e7ee;
+}
+
+.nats-acc-activity {
+    color: #90dfe6;
+}
+
 .nats-top-row,
 .nats-middle-row,
 .nats-lower-row {
@@ -81,12 +493,15 @@
 }
 
 .nats-top-row {
-    min-height: 260px;
+    min-height: 300px;
 }
 
-.nats-middle-row,
+.nats-middle-row {
+    min-height: 170px;
+}
+
 .nats-lower-row {
-    min-height: 180px;
+    min-height: 150px;
 }
 
 .nats-top-row > .nats-glass-card,
@@ -96,39 +511,7 @@
 
 .nats-activity-card {
     min-width: 0;
-}
-
-.nats-quick-actions-card {
-    min-width: 230px;
-    max-width: 320px;
-}
-
-.nats-actions-grid,
-.nats-action-column {
-    spacing: 9px;
-}
-
-.nats-action-button {
-    padding: 7px 9px;
-    background-color: rgba(226, 237, 244, 0.07);
-    border: 1px solid rgba(226, 237, 244, 0.12);
-    border-radius: 9px;
-    color: #d8e1e6;
-    font-family: "FiraCode Nerd Font";
-    font-size: 9px;
-    font-weight: bold;
-    transition-duration: 140ms;
-}
-
-.nats-action-button:hover,
-.nats-action-button:focus {
-    background-color: rgba(155, 207, 219, 0.15);
-    border-color: rgba(155, 207, 219, 0.3);
-    color: #f1f7f8;
-}
-
-.nats-action-button:active {
-    background-color: rgba(155, 207, 219, 0.22);
+    min-height: 120px;
 }
 
 .nats-glass-card {
@@ -137,7 +520,6 @@
     background-color: rgba(24, 32, 43, 0.52);
     border: 1px solid rgba(226, 237, 244, 0.1);
     border-radius: 20px;
-    transition-duration: 160ms;
 }
 
 .nats-glass-card:hover {
@@ -232,15 +614,15 @@
 }
 
 .nats-core-grid {
-    spacing: 10px;
+    spacing: 7px;
 }
 
 .nats-core-column {
-    spacing: 5px;
+    spacing: 3px;
 }
 
 .nats-core-metric {
-    spacing: 3px;
+    spacing: 2px;
 }
 
 .nats-core-metric .nats-progress-label,
@@ -255,8 +637,54 @@
 }
 
 .nats-system-values {
-    spacing: 12px;
+    spacing: 6px;
     padding-bottom: 2px;
+}
+
+.nats-telemetry-details {
+    spacing: 2px;
+}
+
+.nats-telemetry-row {
+    spacing: 8px;
+}
+
+.nats-telemetry-label,
+.nats-telemetry-value {
+    font-family: "FiraCode Nerd Font";
+    font-size: 8px;
+}
+
+.nats-telemetry-label {
+    color: #94a4ad;
+}
+
+.nats-telemetry-value {
+    color: #d6e1e6;
+    font-weight: bold;
+}
+
+.nats-system-identity {
+    spacing: 1px;
+    padding-top: 3px;
+    border-top-width: 1px;
+    border-top-color: rgba(190, 207, 219, 0.10);
+}
+
+.nats-system-identity .nats-telemetry-label,
+.nats-system-identity .nats-telemetry-value {
+    font-size: 7px;
+}
+
+.nats-activity-card .nats-history-track {
+    spacing: 4px;
+    padding: 4px 8px;
+}
+
+.nats-activity-peaks {
+    padding-top: 3px;
+    border-top-width: 1px;
+    border-top-color: rgba(190, 207, 219, 0.10);
 }
 
 .nats-system-metric {
@@ -375,7 +803,7 @@
 }
 
 .nats-activity-values {
-    spacing: 14px;
+    spacing: 6px;
 }
 
 .nats-history-track {

@@ -32,10 +32,6 @@
       <default>true</default>
       <summary>Show storage</summary>
     </key>
-    <key name="show-power" type="b">
-      <default>true</default>
-      <summary>Show power section</summary>
-    </key>
     <key name="show-activity" type="b">
       <default>true</default>
       <summary>Show activity history</summary>

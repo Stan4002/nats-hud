@@ -84,6 +84,16 @@ export function formatTemperature(celsius) {
 	return `${celsius.toFixed(1)}°C`;
 }
 
+export function formatFrequency(megahertz) {
+	if (!Number.isFinite(megahertz) || megahertz <= 0)
+		return INVALID_VALUE;
+
+	if (megahertz >= 1000)
+		return `${(megahertz / 1000).toFixed(1)} GHz`;
+
+	return `${Math.round(megahertz)} MHz`;
+}
+
 export function formatLoad(value) {
 	if (!Number.isFinite(value))
 		return INVALID_VALUE;

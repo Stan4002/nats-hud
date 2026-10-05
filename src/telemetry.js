@@ -145,6 +145,23 @@ function readLoadAverage() {
 	};
 }
 
+function readCpuFrequencyMHz() {
+	for (const path of [
+		'/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq',
+		'/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq'
+	]) {
+		const rawValue = readOptionalTextFile(path);
+		if (rawValue === null)
+			continue;
+
+		const frequencyKHz = Number(rawValue);
+		if (Number.isFinite(frequencyKHz) && frequencyKHz > 0)
+			return frequencyKHz / 1000;
+	}
+
+	return null;
+}
+
 function readNetworkCounters() {
 	const candidates = [];
 
@@ -188,7 +205,7 @@ function readNetworkCounters() {
 function readRootFilesystem() {
 	try {
 		const info = Gio.File.new_for_path('/').query_filesystem_info(
-			'filesystem::size,filesystem::free',
+			'filesystem::size,filesystem::free,filesystem::type',
 			null
 		);
 		const totalBytes = info.get_attribute_uint64('filesystem::size');
@@ -202,14 +219,20 @@ function readRootFilesystem() {
 			totalBytes,
 			usedBytes,
 			freeBytes,
-			usagePercent: (usedBytes / totalBytes) * 100
+			usagePercent: (usedBytes / totalBytes) * 100,
+			mountPoint: '/',
+			filesystemType: info.has_attribute('filesystem::type')
+				? info.get_attribute_string('filesystem::type')
+				: null
 		};
 	} catch (_error) {
 		return {
 			totalBytes: null,
 			usedBytes: null,
 			freeBytes: null,
-			usagePercent: null
+			usagePercent: null,
+			mountPoint: '/',
+			filesystemType: null
 		};
 	}
 }
@@ -230,12 +253,46 @@ function readMemory() {
 		throw new Error('Unable to read total and available memory from /proc/meminfo');
 
 	const usedBytes = totalBytes - availableBytes;
+	const cachedBytes = entries.get('Cached') ?? null;
+	const swapTotalBytes = entries.get('SwapTotal') ?? null;
+	const swapFreeBytes = entries.get('SwapFree') ?? null;
 
 	return {
 		usedBytes,
 		totalBytes,
 		availableBytes,
-		usagePercent: (usedBytes / totalBytes) * 100
+		usagePercent: (usedBytes / totalBytes) * 100,
+		cachedBytes,
+		swapTotalBytes,
+		swapFreeBytes,
+		swapUsedBytes: swapTotalBytes !== null && swapFreeBytes !== null
+			? Math.max(0, swapTotalBytes - swapFreeBytes)
+			: null
+	};
+}
+
+function readSystemIdentity() {
+	const releaseText = readOptionalTextFile('/etc/os-release') ?? '';
+	const releaseEntries = new Map();
+
+	for (const line of releaseText.split('\n')) {
+		const match = line.match(/^([A-Z_]+)=(.*)$/);
+		if (!match)
+			continue;
+
+		let value = match[2].trim();
+		if ((value.startsWith('"') && value.endsWith('"')) ||
+			(value.startsWith("'") && value.endsWith("'"))) {
+			value = value.slice(1, -1);
+		}
+		releaseEntries.set(match[1], value.replace(/\\(["'\\])/g, '$1'));
+	}
+
+	return {
+		hostname: readOptionalTextFile('/proc/sys/kernel/hostname') ?? GLib.get_host_name(),
+		kernelRelease: readOptionalTextFile('/proc/sys/kernel/osrelease'),
+		osName: releaseEntries.get('PRETTY_NAME') ?? releaseEntries.get('NAME') ?? null,
+		architecture: readOptionalTextFile('/proc/sys/kernel/arch')
 	};
 }
 
@@ -243,6 +300,7 @@ export class SystemTelemetry {
 	constructor() {
 		this._previousCpuCounters = new Map();
 		this._previousNetworkSample = null;
+		this._systemIdentity = readSystemIdentity();
 	}
 
 	readSnapshot() {
@@ -276,14 +334,17 @@ export class SystemTelemetry {
 		return {
 			cpu: {
 				usagePercent: cpuUsagePercent,
-				cores
+				cores,
+				logicalCpuCount: cores.length,
+				frequencyMHz: readCpuFrequencyMHz()
 			},
 			memory: readMemory(),
 			temperatureCelsius: readCpuTemperature(),
 			uptimeSeconds: readUptimeSeconds(),
 			loadAverage: readLoadAverage(),
 			network,
-			storage: readRootFilesystem()
+			storage: readRootFilesystem(),
+			system: this._systemIdentity
 		};
 	}
 
@@ -294,7 +355,9 @@ export class SystemTelemetry {
 			return {
 				interfaceName: null,
 				downloadBytesPerSecond: null,
-				uploadBytesPerSecond: null
+				uploadBytesPerSecond: null,
+				rxTotalBytes: null,
+				txTotalBytes: null
 			};
 		}
 
@@ -319,7 +382,9 @@ export class SystemTelemetry {
 		return {
 			interfaceName: current.interfaceName,
 			downloadBytesPerSecond,
-			uploadBytesPerSecond
+			uploadBytesPerSecond,
+			rxTotalBytes: current.receiveBytes,
+			txTotalBytes: current.transmitBytes
 		};
 	}
 }
