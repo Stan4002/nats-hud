@@ -118,6 +118,33 @@ export const MetricValue = GObject.registerClass({
 	}
 });
 
+const ProgressTrack = GObject.registerClass({
+	GTypeName: 'NatsHudProgressTrack'
+}, class ProgressTrack extends St.Widget {
+	constructor(percent = 0) {
+		super({style_class: 'nats-progress-track', x_expand: true});
+		this._percent = clamp(percent, 0, 100);
+		this.fill = new St.Widget({style_class: 'nats-progress-fill'});
+		this.add_child(this.fill);
+	}
+
+	setPercent(percent) {
+		const next = clamp(percent, 0, 100);
+		if (next === this._percent)
+			return;
+
+		this._percent = next;
+		this.queue_relayout();
+	}
+
+	vfunc_allocate(box) {
+		this.set_allocation(box);
+		const fillBox = this.get_theme_node().get_content_box(box);
+		fillBox.x2 = fillBox.x1 + (fillBox.x2 - fillBox.x1) * this._percent / 100;
+		this.fill.allocate(fillBox);
+	}
+});
+
 export const ProgressMetric = GObject.registerClass({
 	GTypeName: 'NatsHudProgressMetric'
 }, class ProgressMetric extends St.BoxLayout {
@@ -145,16 +172,8 @@ export const ProgressMetric = GObject.registerClass({
 		header.add_child(this.labelLabel);
 		header.add_child(this.valueLabel);
 
-		this.progressTrack = new St.Widget({
-			style_class: 'nats-progress-track',
-			x_expand: true
-		});
-		this.progressFill = new St.Widget({
-			style_class: 'nats-progress-fill',
-			x_align: Clutter.ActorAlign.START
-		});
-		this.progressTrack.add_child(this.progressFill);
-		this.progressTrack.connect('notify::width', () => this._updateFillWidth());
+		this.progressTrack = new ProgressTrack(percent);
+		this.progressFill = this.progressTrack.fill;
 
 		this.add_child(header);
 		this.add_child(this.progressTrack);
@@ -162,14 +181,8 @@ export const ProgressMetric = GObject.registerClass({
 	}
 
 	update(percent, text) {
-		this._percent = clamp(percent, 0, 100);
-		this._updateFillWidth();
+		this.progressTrack.setPercent(percent);
 		this.valueLabel.text = toDisplayText(text);
-	}
-
-	_updateFillWidth() {
-		const trackWidth = this.progressTrack.get_width();
-		this.progressFill.set_width(trackWidth * this._percent / 100);
 	}
 });
 

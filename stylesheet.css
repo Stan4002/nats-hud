@@ -357,6 +357,10 @@
     margin-top: -2px;
 }
 
+.nats-assistant-page .nats-ambient-more {
+    margin-top: 0;
+}
+
 .nats-ambient-calendar-heading {
     margin-top: 3px;
     padding-top: 6px;

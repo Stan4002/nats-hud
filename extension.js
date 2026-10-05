@@ -33,6 +33,7 @@ import {
     SparklineLabel
 } from './src/widgets.js';
 import {
+    launchApplication,
     openBtop,
     openSystemMonitor,
     openFiles,
@@ -87,6 +88,7 @@ export default class NatsHudExtension extends Extension {
         this._assistantPageActor = null;
         this._assistantPageIndicators = null;
         this._assistantTaskListScrollView = null;
+        this._assistantTasksPageRefs = null;
         this._lastSnapshot = null;
         this._startupLayoutId = 0;
         this._assistantMonitor = this._setupAssistantMonitor();
@@ -226,8 +228,9 @@ export default class NatsHudExtension extends Extension {
             ? 'offline'
             : 'error';
         this._setAssistantConnection(state);
-        if (pageIndex !== null && this._isInteractionOpen() &&
-            this._activeSection === 'control' && this._assistantPage === pageIndex)
+        if (this._isInteractionOpen() && this._activeSection === 'control' &&
+            (this._assistantPage === 0 ||
+                (pageIndex !== null && this._assistantPage === pageIndex)))
             this._renderAssistantCurrentPage();
     }
 
@@ -258,8 +261,9 @@ export default class NatsHudExtension extends Extension {
             this._assistantHome = home;
             this._setAssistantConnection('online');
             this._renderAmbientEvents();
-            if (pageIndex !== null && this._isInteractionOpen() &&
-                this._activeSection === 'control' && this._assistantPage === pageIndex)
+            if (this._isInteractionOpen() && this._activeSection === 'control' &&
+                (this._assistantPage === 0 ||
+                    (pageIndex !== null && this._assistantPage === pageIndex)))
                 this._renderAssistantCurrentPage();
         } catch (error) {
             this._handleAssistantError(client, error, pageIndex);
@@ -1581,6 +1585,7 @@ export default class NatsHudExtension extends Extension {
         this._assistantDot0Button = null;
         this._assistantDot1Button = null;
         this._assistantTaskListScrollView = null;
+        this._assistantTasksPageRefs = null;
         for (const child of this._interactionContent?.get_children() ?? []) {
             this._interactionContent.remove_child(child);
             child.destroy();
@@ -1789,27 +1794,46 @@ export default class NatsHudExtension extends Extension {
         if (!this._assistantPageHost)
             return;
 
-        this._assistantPageActor = null;
-        this._assistantTaskListScrollView = null;
-        for (const child of this._assistantPageHost.get_children()) {
-            this._assistantPageHost.remove_child(child);
-            child.destroy();
-        }
+        try {
+            if (this._assistantPage === 1 && this._updateAssistantTasksPage())
+                return;
 
-        let page;
-        switch (this._assistantPage) {
-        case 1:
-            page = this._buildTasksPage();
-            break;
-        case 2:
-            page = this._buildAssistantPage();
-            break;
-        default:
-            this._assistantPage = 0;
-            page = this._buildTodayPage();
-            break;
+            this._assistantTasksPageRefs = null;
+            this._assistantPageActor = null;
+            this._assistantTaskListScrollView = null;
+            for (const child of this._assistantPageHost.get_children()) {
+                this._assistantPageHost.remove_child(child);
+                child.destroy();
+            }
+
+            let page;
+            switch (this._assistantPage) {
+            case 1:
+                page = this._buildTasksPage();
+                break;
+            case 2:
+                page = this._buildAssistantPage();
+                break;
+            default:
+                this._assistantPage = 0;
+                page = this._buildTodayPage();
+                break;
+            }
+            this._assistantPageHost.add_child(page);
+        } catch (error) {
+            logError(error, `NATS HUD: assistant page render failed page=${this._assistantPage}`);
+            this._assistantTasksPageRefs = null;
+            this._assistantPageActor?.destroy();
+            this._assistantTaskListScrollView = null;
+            const fallback = new St.Label({
+                text: 'Unable to load assistant page. Use the pager to retry.',
+                style_class: 'nats-ambient-reminder',
+                x_expand: true
+            });
+            fallback.clutter_text.line_wrap = true;
+            this._assistantPageHost.add_child(fallback);
+            this._assistantPageActor = fallback;
         }
-        this._assistantPageHost.add_child(page);
     }
 
     _createAssistantPage() {
@@ -1913,6 +1937,32 @@ export default class NatsHudExtension extends Extension {
             }
         } else {
             this._addAssistantPageRow(page, nextEvent ? 'Nothing else scheduled' : 'Nothing scheduled');
+        }
+
+        section('TASKS');
+        const homeTasks = this._assistantHome?.tasks;
+        if (this._assistantConnection === 'offline') {
+            this._addAssistantPageRow(page, 'Assistant offline · Tasks unavailable');
+        } else if (this._assistantConnection === 'error') {
+            this._addAssistantPageRow(page, 'Tasks unavailable');
+        } else if (!homeTasks || !Array.isArray(homeTasks.items)) {
+            this._addAssistantPageRow(page, this._assistantConnection === 'unknown'
+                ? 'Connecting to assistant · Tasks unavailable'
+                : 'Loading tasks');
+        } else {
+            const pending = Number.isInteger(homeTasks.pending) && homeTasks.pending >= 0
+                ? homeTasks.pending : 0;
+            const dueToday = Number.isInteger(homeTasks.due_today) && homeTasks.due_today >= 0
+                ? homeTasks.due_today : 0;
+            if (pending === 0) {
+                this._addAssistantPageRow(page, 'No pending tasks');
+            } else {
+                this._addAssistantPageRow(page, `${pending} pending · ${dueToday} due today`);
+                const taskItems = homeTasks.items.filter((task) => task && !task.completed &&
+                    typeof task.title === 'string' && task.title.trim()).slice(0, 3);
+                for (const task of taskItems)
+                    this._addAssistantPageRow(page, `□ ${task.title.trim()}`);
+            }
         }
 
         section('CALENDAR');
@@ -2026,62 +2076,119 @@ export default class NatsHudExtension extends Extension {
         return page;
     }
 
+    _getAssistantTasksPageState() {
+        const connectionMessage = this._assistantConnection === 'offline'
+            ? 'ASSISTANT OFFLINE'
+            : this._assistantConnection === 'error'
+                ? 'ASSISTANT ERROR'
+                : this._assistantConnection === 'unknown'
+                    ? 'CONNECTING TO ASSISTANT'
+                    : !this._assistantTasksLoaded ? 'LOADING TASKS' : null;
+        return {
+            tasks: (this._taskState?.tasks ?? this._loadTasks())
+                .filter((task) => task && !task.completed),
+            canMutateTasks: this._assistantTasksLoaded &&
+                this._assistantConnection === 'online',
+            connectionMessage
+        };
+    }
+
+    _updateAssistantTasksPage() {
+        const refs = this._assistantTasksPageRefs;
+        if (!refs || refs.page !== this._assistantPageActor)
+            return false;
+
+        const {tasks, connectionMessage, canMutateTasks} = this._getAssistantTasksPageState();
+        // Only membership/order changes need the empty-state or list rebuilt.
+        if (tasks.length !== refs.rows.length ||
+            tasks.some((task, index) => task.id !== refs.rows[index].id))
+            return false;
+
+        if (connectionMessage !== refs.connectionMessage) {
+            if (!refs.connectionLabel && connectionMessage) {
+                refs.connectionLabel = new St.Label({
+                    text: connectionMessage,
+                    style_class: 'nats-ambient-more',
+                    x_expand: true
+                });
+                refs.page.insert_child_at_index(refs.connectionLabel, 1);
+            } else if (refs.connectionLabel) {
+                refs.connectionLabel.text = connectionMessage ?? '';
+                refs.connectionLabel.visible = connectionMessage !== null;
+            }
+            refs.connectionMessage = connectionMessage;
+        }
+        for (const [index, task] of tasks.entries()) {
+            const row = refs.rows[index];
+            if (row.titleLabel.text !== task.title)
+                row.titleLabel.text = task.title;
+            if (canMutateTasks !== refs.canMutateTasks) {
+                for (const button of [row.checkbox, row.deleteButton]) {
+                    button.reactive = canMutateTasks;
+                    button.can_focus = canMutateTasks;
+                }
+            }
+        }
+        refs.canMutateTasks = canMutateTasks;
+        return true;
+    }
+
     _buildTasksPage() {
         const page = this._createAssistantPage();
         page.add_child(this._createAssistantSectionTitle('TASKS'));
-        if (this._assistantConnection === 'offline' ||
-            this._assistantConnection === 'error' ||
-            this._assistantConnection === 'unknown' ||
-            !this._assistantTasksLoaded) {
-            const connectionMessage = this._assistantConnection === 'offline'
-                ? 'ASSISTANT OFFLINE'
-                : this._assistantConnection === 'error'
-                    ? 'ASSISTANT ERROR'
-                    : this._assistantConnection === 'unknown'
-                        ? 'CONNECTING TO ASSISTANT'
-                        : 'LOADING TASKS';
+
+        const connectionMessage = this._assistantConnection === 'offline'
+            ? 'ASSISTANT OFFLINE'
+            : this._assistantConnection === 'error'
+                ? 'ASSISTANT ERROR'
+                : this._assistantConnection === 'unknown'
+                    ? 'CONNECTING TO ASSISTANT'
+                    : !this._assistantTasksLoaded ? 'LOADING TASKS' : null;
+        if (connectionMessage) {
             page.add_child(new St.Label({
                 text: connectionMessage,
                 style_class: 'nats-ambient-more',
                 x_expand: true
             }));
         }
-        const tasks = (this._taskState?.tasks ?? this._loadTasks())
-            .filter((task) => task && !task.completed);
+
+        const taskList = new St.BoxLayout({
+            vertical: true,
+            style_class: 'nats-interaction-content nats-assistant-task-list-content',
+            x_expand: true
+        });
+        this._assistantTaskListScrollView = new St.ScrollView({
+            style_class: 'nats-assistant-task-list',
+            x_expand: true,
+            y_expand: true,
+            overlay_scrollbars: true
+        });
+        this._assistantTaskListScrollView.set_policy(
+            St.PolicyType.NEVER,
+            St.PolicyType.AUTOMATIC
+        );
+        this._assistantTaskListScrollView.add_child(taskList);
+        page.add_child(this._assistantTaskListScrollView);
+
+        const cachedTasks = this._taskState?.tasks;
+        const tasks = Array.isArray(cachedTasks)
+            ? cachedTasks.filter((task) => task && !task.completed)
+            : [];
         const canMutateTasks = this._assistantTasksLoaded &&
             this._assistantConnection === 'online';
         if (tasks.length === 0) {
-            page.add_child(new St.Label({
-                text: 'No pending tasks',
-                style_class: 'nats-ambient-reminder nats-assistant-empty-tasks',
+            taskList.add_child(new St.Label({
+                text: 'NO TASKS',
                 x_expand: true
             }));
         } else {
-            const taskList = new St.BoxLayout({
-                vertical: true,
-                style_class: 'nats-interaction-content nats-assistant-task-list-content',
-                x_expand: true
-            });
-            this._assistantTaskListScrollView = new St.ScrollView({
-                style_class: 'nats-assistant-task-list',
-                x_expand: true,
-                y_expand: true,
-                overlay_scrollbars: true
-            });
-            this._assistantTaskListScrollView.set_policy(
-                St.PolicyType.NEVER,
-                St.PolicyType.AUTOMATIC
-            );
-            this._assistantTaskListScrollView.add_child(taskList);
-            page.add_child(this._assistantTaskListScrollView);
-
             for (const task of tasks) {
                 const row = new St.BoxLayout({
                     style_class: 'nats-interaction-stat-row',
                     x_expand: true
                 });
                 const checkbox = new St.Button({
-                    label: task.completed ? '✓' : '○',
+                    label: '○',
                     style_class: 'nats-interaction-button',
                     reactive: canMutateTasks,
                     can_focus: canMutateTasks,
@@ -2122,16 +2229,9 @@ export default class NatsHudExtension extends Extension {
             can_focus: true
         });
         addTaskButton.connect('clicked', () => this._dispatchAssistantAction('ADD_TASK'));
-        const captureButton = new St.Button({
-            label: '+ CAPTURE',
-            style_class: 'nats-interaction-button',
-            x_expand: true,
-            can_focus: true
-        });
-        captureButton.connect('clicked', () => this._dispatchAssistantAction('QUICK_CAPTURE'));
         actions.add_child(addTaskButton);
-        actions.add_child(captureButton);
         page.add_child(actions);
+
         return page;
     }
 
@@ -2207,6 +2307,70 @@ export default class NatsHudExtension extends Extension {
 
     _dispatchAssistantAction(action, payload = null) {
         log(`NATS HUD: assistant action ${action} requested`);
+
+        const refreshAfterQuickAction = () => {
+            GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 2, () => {
+                this._refreshAssistantHome(0);
+                this._refreshAssistantTasks(1);
+                return GLib.SOURCE_REMOVE;
+            });
+        };
+
+        if (action === 'ADD_TASK') {
+            const command = [
+                'nats-assistant',
+                'quick',
+                'task',
+                ...(payload && typeof payload.title === 'string' && payload.title.trim()
+                    ? ['--title', payload.title.trim()]
+                    : [])
+            ];
+            const client = this._assistantClient;
+            const process = launchApplication(command[0], command.slice(1));
+            if (!process)
+                return;
+            process.wait_check_async(null, (subprocess, result) => {
+                try {
+                    if (!subprocess.wait_check_finish(result))
+                        return;
+                } catch {
+                    return;
+                }
+                if (!client || !this._assistantClientIsActive(client))
+                    return;
+                this._refreshAssistantTasks(1);
+                this._refreshAssistantHome(0);
+            });
+            return;
+        }
+
+        if (action === 'QUICK_CAPTURE') {
+            const command = [
+                'nats-assistant',
+                'quick',
+                'capture',
+                ...(payload && typeof payload.text === 'string' && payload.text.trim()
+                    ? ['--text', payload.text.trim()]
+                    : [])
+            ];
+            launchApplication(command[0], command.slice(1));
+            refreshAfterQuickAction();
+            return;
+        }
+
+        if (action === 'TASK_QUICK_ENTRY') {
+            const command = ['nats-assistant', 'quick', 'task'];
+            launchApplication(command[0], command.slice(1));
+            refreshAfterQuickAction();
+            return;
+        }
+
+        if (action === 'CAPTURE_QUICK_ENTRY') {
+            const command = ['nats-assistant', 'quick', 'capture'];
+            launchApplication(command[0], command.slice(1));
+            refreshAfterQuickAction();
+            return;
+        }
     }
 
     _buildCommsView() {
@@ -3242,6 +3406,9 @@ export default class NatsHudExtension extends Extension {
     }
 
     _updateMetrics(snapshot = null) {
+        if (!this._hud)
+            return;
+
         try {
             const currentSnapshot = snapshot ?? this._telemetry.readSnapshot();
             this._lastSnapshot = currentSnapshot;
@@ -3414,6 +3581,7 @@ export default class NatsHudExtension extends Extension {
         this._assistantPageActor = null;
         this._assistantPageIndicators = null;
         this._assistantTaskListScrollView = null;
+        this._assistantTasksPageRefs = null;
         this._cpuInteractionRefs = null;
         this._memoryInteractionRefs = null;
         this._networkInteractionRefs = null;

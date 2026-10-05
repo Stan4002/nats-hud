@@ -1,4 +1,5 @@
 import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
 
 function reportError(message, error) {
 	logError(error, `NATS HUD: ${message}`);
@@ -42,7 +43,26 @@ export function launchApplication(executable, args = []) {
 		return null;
 	}
 
-	return launchCommand([executable, ...args]);
+	let resolvedExecutable = executable;
+	if (executable === 'nats-assistant') {
+		const homeDir = GLib.get_home_dir();
+		const candidates = [
+			GLib.find_program_in_path(executable),
+			GLib.build_filenamev([homeDir, '.local', 'bin', executable]),
+			GLib.build_filenamev([homeDir, 'Projects', 'nats-assistant', '.venv', 'bin', executable])
+		];
+		resolvedExecutable = candidates.find(path => path &&
+			GLib.file_test(path, GLib.FileTest.IS_REGULAR) &&
+			GLib.file_test(path, GLib.FileTest.IS_EXECUTABLE));
+		if (!resolvedExecutable) {
+			reportError('Cannot launch nats-assistant: no executable found in PATH, ~/.local/bin, or ~/Projects/nats-assistant/.venv/bin',
+				new Error('nats-assistant executable is unavailable'));
+			return null;
+		}
+		resolvedExecutable = GLib.canonicalize_filename(resolvedExecutable, null);
+	}
+
+	return launchCommand([resolvedExecutable, ...args]);
 }
 
 export function launchTerminal(commandArgs = []) {

@@ -37,6 +37,27 @@ function normalizeTask(task) {
     };
 }
 
+function normalizeCapture(capture) {
+    if (!capture || typeof capture !== 'object' ||
+        typeof capture.id !== 'string' || !capture.id ||
+        typeof capture.text !== 'string')
+        throw new AssistantClientError('Assistant returned an invalid capture', 'response');
+
+    const text = capture.text.trim();
+    if (!text)
+        throw new AssistantClientError('Assistant returned an invalid capture', 'response');
+
+    const status = typeof capture.status === 'string' ? capture.status : 'inbox';
+    return {
+        id: capture.id,
+        text,
+        status: ['inbox', 'processed', 'archived'].includes(status) ? status : 'inbox',
+        source: typeof capture.source === 'string' ? capture.source : 'nats',
+        created_at: typeof capture.created_at === 'string' ? capture.created_at : null,
+        updated_at: typeof capture.updated_at === 'string' ? capture.updated_at : null
+    };
+}
+
 export class AssistantClient {
     constructor() {
         this._session = new Soup.Session({
@@ -85,6 +106,11 @@ export class AssistantClient {
                     due_today: Number.isInteger(home.tasks.due_today) ? home.tasks.due_today : 0,
                     items: home.tasks.items.map(normalizeTask)
                 },
+                captures: home.captures && typeof home.captures === 'object'
+                    ? {
+                        inbox_count: Number.isInteger(home.captures.inbox_count) ? home.captures.inbox_count : 0
+                    }
+                    : {inbox_count: 0},
                 comms: home.comms && typeof home.comms === 'object'
                     ? home.comms
                     : {attention_count: 0, items: []}
@@ -109,6 +135,10 @@ export class AssistantClient {
         });
     }
 
+    createTask(task) {
+        return this._request('POST', '/tasks', task).then(normalizeTask);
+    }
+
     updateTask(taskId, patch) {
         return this._request(
             'PATCH',
@@ -124,6 +154,10 @@ export class AssistantClient {
             undefined,
             false
         );
+    }
+
+    createCapture(capture) {
+        return this._request('POST', '/captures', capture).then(normalizeCapture);
     }
 
     cancelAll() {
