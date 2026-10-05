@@ -45,9 +45,9 @@ It is not an assistant service yet. “NATS Comms” is a future roadmap item de
 
 ## NATS HUD / NATS Assistant boundary
 
-**NATS HUD** is the provider-agnostic presentation layer. It is responsible for telemetry visualization, assistant summaries, task/calendar/comms presentation, focused system views, and dispatching assistant intents. The `+ TASK` and `+ CAPTURE` buttons currently log intent requests only; they do not create tasks or communicate with a service.
+**NATS HUD** is the provider-agnostic presentation layer. It is responsible for telemetry visualization, assistant summaries, task/calendar/comms presentation, focused system views, and dispatching assistant intents. Task reads and completion/deletion requests use the local NATS Assistant API at `http://127.0.0.1:8765`. The `+ TASK` and `+ CAPTURE` buttons remain future hooks and do not create tasks.
 
-**NATS Assistant** is a future, separate local service responsible for task ownership, calendar sync, comms sync, authentication, persistence, normalization, reminders, classification, and drafts. Keep this backend out of the GNOME Shell process; do not add provider integrations to the HUD.
+**NATS Assistant** is the separate local backend/core and authoritative owner of task persistence. The HUD uses asynchronous GJS Soup 3 with short timeouts and in-memory last-successful task/home caches. During this transition, calendar, comms, and focus JSON state remains local to the HUD. Legacy `tasks.json` is only a startup/offline fallback until the backend has successfully supplied tasks; the HUD does not write it. Keep backend logic and provider integrations out of the GNOME Shell process.
 
 ## Architecture that must be preserved
 
