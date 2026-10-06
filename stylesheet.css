@@ -142,6 +142,31 @@
     margin-top: -3px;
 }
 
+.nats-calendar-selected,
+.nats-calendar-day:focus {
+    border-color: #c8d5db;
+    box-shadow: inset 0 0 0 1px rgba(200, 213, 219, 0.28);
+}
+
+.nats-calendar-compact {
+    spacing: 3px;
+    padding: 4px 5px;
+}
+
+.nats-calendar-compact .nats-calendar-month,
+.nats-calendar-compact .nats-calendar-day-number {
+    font-size: 8px;
+}
+
+.nats-calendar-compact .nats-calendar-day {
+    min-height: 13px;
+    padding: 1px 0;
+}
+
+.nats-calendar-compact .nats-calendar-event-dot {
+    margin-top: 0;
+}
+
 .nats-page-nav {
     spacing: 6px;
 }
@@ -348,6 +373,28 @@
     color: #b5c4ca;
     font-family: "FiraCode Nerd Font";
     font-size: 8px;
+}
+
+.nats-ambient-card .nats-ambient-section-title {
+    color: #a9bdc7;
+}
+
+.nats-ambient-card .nats-ambient-reminder {
+    color: #c8d5db;
+}
+
+.nats-ambient-card .nats-ambient-weekday {
+    color: #a0b2bc;
+}
+
+.nats-ambient-verse {
+    spacing: 2px;
+}
+
+.nats-ambient-card .nats-verse-reference {
+    color: #89c7d1;
+    font-family: "FiraCode Nerd Font";
+    font-size: 7px;
 }
 
 .nats-ambient-more {

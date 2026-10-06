@@ -1,0 +1,27 @@
+{
+  "translation": "KJV",
+  "source": {
+    "title": "The King James Version of the Bible",
+    "url": "https://www.gutenberg.org/ebooks/10",
+    "copyright": "Public domain in the USA",
+    "note": "Complete concise verses checked against the Project Gutenberg KJV text; no modern translation text."
+  },
+  "verses": [
+    {"id": "psalm-23-1", "reference": "Psalm 23:1", "text": "The LORD is my shepherd; I shall not want.", "translation": "KJV", "category": "trust"},
+    {"id": "psalm-46-1", "reference": "Psalm 46:1", "text": "God is our refuge and strength, a very present help in trouble.", "translation": "KJV", "category": "strength"},
+    {"id": "psalm-56-3", "reference": "Psalm 56:3", "text": "What time I am afraid, I will trust in thee.", "translation": "KJV", "category": "trust"},
+    {"id": "psalm-119-105", "reference": "Psalm 119:105", "text": "Thy word is a lamp unto my feet, and a light unto my path.", "translation": "KJV", "category": "guidance"},
+    {"id": "proverbs-3-6", "reference": "Proverbs 3:6", "text": "In all thy ways acknowledge him, and he shall direct thy paths.", "translation": "KJV", "category": "guidance"},
+    {"id": "proverbs-16-3", "reference": "Proverbs 16:3", "text": "Commit thy works unto the LORD, and thy thoughts shall be established.", "translation": "KJV", "category": "work"},
+    {"id": "proverbs-17-22", "reference": "Proverbs 17:22", "text": "A merry heart doeth good like a medicine: but a broken spirit drieth the bones.", "translation": "KJV", "category": "joy"},
+    {"id": "matthew-5-9", "reference": "Matthew 5:9", "text": "Blessed are the peacemakers: for they shall be called the children of God.", "translation": "KJV", "category": "peace"},
+    {"id": "john-11-35", "reference": "John 11:35", "text": "Jesus wept.", "translation": "KJV", "category": "compassion"},
+    {"id": "romans-12-12", "reference": "Romans 12:12", "text": "Rejoicing in hope; patient in tribulation; continuing instant in prayer;", "translation": "KJV", "category": "hope"},
+    {"id": "1-corinthians-16-14", "reference": "1 Corinthians 16:14", "text": "Let all your things be done with charity.", "translation": "KJV", "category": "love"},
+    {"id": "2-corinthians-5-7", "reference": "2 Corinthians 5:7", "text": "(For we walk by faith, not by sight:)", "translation": "KJV", "category": "faith"},
+    {"id": "philippians-4-13", "reference": "Philippians 4:13", "text": "I can do all things through Christ which strengtheneth me.", "translation": "KJV", "category": "strength"},
+    {"id": "1-thessalonians-5-16", "reference": "1 Thessalonians 5:16", "text": "Rejoice evermore.", "translation": "KJV", "category": "joy"},
+    {"id": "1-thessalonians-5-17", "reference": "1 Thessalonians 5:17", "text": "Pray without ceasing.", "translation": "KJV", "category": "prayer"},
+    {"id": "hebrews-13-8", "reference": "Hebrews 13:8", "text": "Jesus Christ the same yesterday, and to day, and for ever.", "translation": "KJV", "category": "faith"}
+  ]
+}

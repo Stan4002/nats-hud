@@ -1,5 +1,6 @@
 import Adw from 'gi://Adw';
 import Gtk from 'gi://Gtk';
+import Gio from 'gi://Gio';
 
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
@@ -18,7 +19,7 @@ export default class NatsHudPreferences extends ExtensionPreferences {
         const settings = this.getSettings();
         const page = new Adw.PreferencesPage();
 
-        const appearanceGroup = new Adw.PreferencesGroup({title: 'Appearance'});
+        const appearanceGroup = new Adw.PreferencesGroup({title: 'General'});
         const opacityRow = new Adw.ActionRow({
             title: 'Card opacity',
             subtitle: 'Adjust the translucency of HUD cards'
@@ -40,6 +41,7 @@ export default class NatsHudPreferences extends ExtensionPreferences {
         opacityRow.add_suffix(opacityScale);
         opacityRow.set_activatable_widget(opacityScale);
         appearanceGroup.add(opacityRow);
+        appearanceGroup.add(this._createSwitchRow(settings, 'show-actions', 'Quick actions'));
         page.add(appearanceGroup);
 
         const telemetryGroup = new Adw.PreferencesGroup({title: 'Telemetry'});
@@ -63,23 +65,19 @@ export default class NatsHudPreferences extends ExtensionPreferences {
             telemetryGroup.add(this._createSwitchRow(settings, key, title));
         page.add(telemetryGroup);
 
-        const interfaceGroup = new Adw.PreferencesGroup({title: 'Interface'});
-        interfaceGroup.add(this._createSwitchRow(
-            settings,
-            'show-actions',
-            'Quick actions'
-        ));
-        page.add(interfaceGroup);
+        const personalGroup = new Adw.PreferencesGroup({title: 'Personalization'});
+        const nameRow = new Adw.EntryRow({title: 'Greeting display name'});
+        settings.bind('display-name', nameRow, 'text', Gio.SettingsBindFlags.DEFAULT);
+        personalGroup.add(nameRow);
+        personalGroup.add(this._createSwitchRow(settings, 'show-daily-verse', 'Daily KJV verse'));
+        page.add(personalGroup);
 
         window.add(page);
     }
 
     _createSwitchRow(settings, key, title) {
         const row = new Adw.SwitchRow({title});
-        row.set_active(settings.get_boolean(key));
-        row.connect('notify::active', () => {
-            settings.set_boolean(key, row.get_active());
-        });
+        settings.bind(key, row, 'active', Gio.SettingsBindFlags.DEFAULT);
 
         return row;
     }

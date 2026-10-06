@@ -40,6 +40,16 @@
       <default>true</default>
       <summary>Show quick actions</summary>
     </key>
+    <key name="display-name" type="s">
+      <default>''</default>
+      <summary>Greeting display name</summary>
+      <description>Optional name used in the passive greeting. Empty gives an unnamed greeting.</description>
+    </key>
+    <key name="show-daily-verse" type="b">
+      <default>false</default>
+      <summary>Show daily KJV verse</summary>
+      <description>Show a bundled offline daily verse when the passive rail has room.</description>
+    </key>
     <key name="toggle-interactive-mode" type="as">
       <default>['&lt;Super&gt;&lt;Shift&gt;n']</default>
       <summary>Toggle interactive mode</summary>

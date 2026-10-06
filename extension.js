@@ -4,12 +4,15 @@ import Gio from 'gi://Gio';
 import Clutter from 'gi://Clutter';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
+import Pango from 'gi://Pango';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {SystemTelemetry} from './src/telemetry.js';
 import {AssistantClient} from './src/assistantClient.js';
+import {compactText, greetingForHour, loadVerses, selectDailyVerse} from './src/inspiration.js';
+import {calendarDateKey, createCalendar, updateCalendar, eventsOnCalendarDate} from './src/calendar.js';
 import {
     readCalendarState,
     readCommsState,
@@ -57,6 +60,10 @@ export default class NatsHudExtension extends Extension {
 
         this._settings = this.getSettings();
         this._settingsChangedId = this._settings.connect('changed', (_settings, key) => {
+            if (key === 'display-name' || key === 'show-daily-verse') {
+                this._updateAmbientPersonalization();
+                return;
+            }
             this._applySettings();
             if (key === 'update-interval')
                 this._restartUpdateTimer();
@@ -66,9 +73,13 @@ export default class NatsHudExtension extends Extension {
         this._memoryHistory = [];
         this._networkHistory = [];
         this._calendarState = readCalendarState();
+        this._dailyVerses = loadVerses(this.dir.get_child('assets').get_child('verses-kjv.json'));
+        this._dailyVerse = null;
+        this._ambientVerseDay = null;
         this._taskState = readTaskState();
         this._assistantTasksLoaded = false;
         this._assistantHome = null;
+        this._assistantHomeRequest = null;
         this._assistantConnection = 'unknown';
         this._assistantVersion = null;
         this._assistantClient = new AssistantClient();
@@ -77,6 +88,8 @@ export default class NatsHudExtension extends Extension {
         this._calendarEvents = Array.isArray(this._calendarState?.events) ? this._calendarState.events : [];
         this._activeSection = 'control';
         this._assistantPage = 0;
+        this._assistantSelectedDate = calendarDateKey(new Date());
+        this._assistantHomeRefreshId = 0;
         this._assistantHomeShell = null;
         this._assistantPageHost = null;
         this._assistantPagerNav = null;
@@ -86,6 +99,7 @@ export default class NatsHudExtension extends Extension {
         this._assistantDot1Button = null;
         this._assistantDot2Button = null;
         this._assistantPageActor = null;
+        this._assistantTodayCalendar = null;
         this._assistantPageIndicators = null;
         this._assistantTaskListScrollView = null;
         this._assistantTasksPageRefs = null;
@@ -117,6 +131,7 @@ export default class NatsHudExtension extends Extension {
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
             () => this._toggleInteractiveMode()
         );
+        this._startAssistantHomeRefresh();
     }
 
     _scheduleHudLayoutPass() {
@@ -228,6 +243,8 @@ export default class NatsHudExtension extends Extension {
             ? 'offline'
             : 'error';
         this._setAssistantConnection(state);
+        this._renderAmbientCalendar(new Date());
+        this._renderAmbientEvents();
         if (this._isInteractionOpen() && this._activeSection === 'control' &&
             (this._assistantPage === 0 ||
                 (pageIndex !== null && this._assistantPage === pageIndex)))
@@ -249,25 +266,66 @@ export default class NatsHudExtension extends Extension {
         }
     }
 
+    _startAssistantHomeRefresh() {
+        if (this._assistantHomeRefreshId)
+            return;
+        this._assistantHomeRefreshId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 45, () => {
+            if (!this._hud || !this._assistantClient) {
+                this._assistantHomeRefreshId = 0;
+                return GLib.SOURCE_REMOVE;
+            }
+            this._refreshAssistantHome();
+            return GLib.SOURCE_CONTINUE;
+        });
+        this._refreshAssistantHome();
+    }
+
+    _stopAssistantHomeRefresh() {
+        if (this._assistantHomeRefreshId)
+            GLib.source_remove(this._assistantHomeRefreshId);
+        this._assistantHomeRefreshId = 0;
+    }
+
     async _refreshAssistantHome(pageIndex = null) {
         const client = this._assistantClient;
         if (!client)
             return;
-
-        try {
-            const home = await client.getHome();
-            if (!this._assistantClientIsActive(client))
-                return;
-            this._assistantHome = home;
-            this._setAssistantConnection('online');
-            this._renderAmbientEvents();
-            if (this._isInteractionOpen() && this._activeSection === 'control' &&
-                (this._assistantPage === 0 ||
-                    (pageIndex !== null && this._assistantPage === pageIndex)))
-                this._renderAssistantCurrentPage();
-        } catch (error) {
-            this._handleAssistantError(client, error, pageIndex);
+        if (this._assistantHomeRequest?.client === client) {
+            // A mutation may have happened after the running request began.
+            // Coalesce overlaps into one subsequent fetch, never parallel GETs.
+            this._assistantHomeRequest.again = true;
+            if (pageIndex !== null)
+                this._assistantHomeRequest.pageIndex = pageIndex;
+            return this._assistantHomeRequest.promise;
         }
+        const request = {client, pageIndex, again: false, promise: null};
+        this._assistantHomeRequest = request;
+        request.promise = (async () => {
+            try {
+                do {
+                    request.again = false;
+                    try {
+                        const home = await client.getHome();
+                        if (!this._assistantClientIsActive(client))
+                            return;
+                        this._assistantHome = home;
+                        this._setAssistantConnection('online');
+                        this._renderAmbientCalendar(new Date());
+                        this._renderAmbientEvents();
+                        if (this._isInteractionOpen() && this._activeSection === 'control' &&
+                            (this._assistantPage === 0 ||
+                                (request.pageIndex !== null && this._assistantPage === request.pageIndex)))
+                            this._renderAssistantCurrentPage();
+                    } catch (error) {
+                        this._handleAssistantError(client, error, request.pageIndex);
+                    }
+                } while (request.again && this._assistantClientIsActive(client));
+            } finally {
+                if (this._assistantHomeRequest === request)
+                    this._assistantHomeRequest = null;
+            }
+        })();
+        return request.promise;
     }
 
     async _refreshAssistantTasks(pageIndex = null) {
@@ -667,8 +725,8 @@ export default class NatsHudExtension extends Extension {
         lowerRow.add_child(this._activityCard);
 
         this._ambientCard = new GlassCard({
-            title: 'CALENDAR',
-            subtitle: 'Upcoming',
+            title: greetingForHour(GLib.DateTime.new_now_local().get_hour(), this._settings.get_string('display-name')),
+            subtitle: 'Daily overview',
             iconText: '◷',
             reactive: false
         });
@@ -676,6 +734,9 @@ export default class NatsHudExtension extends Extension {
         this._ambientCard.y_expand = true;
         this._ambientCard.x_expand = false;
         this._ambientCard.x_align = Clutter.ActorAlign.END;
+        this._ambientCard.titleLabel.clutter_text.set_single_line_mode(true);
+        this._ambientCard.titleLabel.clutter_text.set_line_wrap(false);
+        this._ambientCard.titleLabel.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
         this._buildAmbientCard();
         this._hud.add_child(lowerRow);
 
@@ -816,57 +877,79 @@ export default class NatsHudExtension extends Extension {
         if (!this._ambientReminderList || !this._ambientMoreLabel)
             return;
 
-        this._calendarEvents = this._calendarState?.events ?? this._loadCalendarEvents();
-        const visibleCount = this._interactiveMode ? 6 : 3;
-        const upcoming = this._getFutureCalendarEvents().slice(0, Math.max(visibleCount, 1));
+        const calendar = this._assistantHome?.calendar;
+        const status = calendar && ['offline', 'error'].includes(this._assistantConnection)
+            ? this._assistantConnection : calendar?.status;
+        const calendarMessage = !calendar || status === 'online' ? null
+            : status === 'not_connected' ? 'Calendar not connected'
+                : status === 'offline' ? 'Calendar offline' : 'Calendar unavailable';
+        const prepareEvent = (event) => {
+            const timestamp = Date.parse(event?.start ?? event?.end ?? '');
+            if (!event || event.status === 'cancelled' ||
+                typeof event.title !== 'string' || !event.title.trim() || !Number.isFinite(timestamp))
+                return null;
+            return {...event, title: event.title.trim(), _timestamp: timestamp};
+        };
+        const events = (calendar ? calendarMessage ? []
+            : (Array.isArray(calendar.events) ? calendar.events : [])
+            : (Array.isArray(this._calendarEvents) ? this._calendarEvents : []))
+            .map(prepareEvent).filter(Boolean)
+            .sort((first, second) => first._timestamp - second._timestamp);
+        const nowTime = Date.now();
+        const futureEvents = events.filter((event) => event._timestamp > nowTime);
+        const nextCandidate = calendar ? calendarMessage ? null : prepareEvent(calendar.next)
+            : futureEvents[0] ?? null;
+        const nextEvent = nextCandidate?._timestamp > nowTime ? nextCandidate : null;
+        const activeEvent = calendar ? events.find((event) => event._timestamp <= nowTime &&
+            Date.parse(event.end ?? '') > nowTime) : null;
+        const remainingEvents = futureEvents.filter((event) =>
+            event.id !== nextEvent?.id || event._timestamp !== nextEvent?._timestamp);
+        const upcoming = remainingEvents.slice(0, 1);
+        const eventText = (event) => {
+            const start = GLib.DateTime.new_from_unix_local(Math.floor(event._timestamp / 1000));
+            const time = event.all_day ? 'All day' : start.format('%H:%M');
+            const day = start.format('%Y-%m-%d') === GLib.DateTime.new_now_local().format('%Y-%m-%d')
+                ? '' : `${start.format('%d %b')} · `;
+            return `${day}${time} ${event.title}`;
+        };
 
         this._ambientReminderList.remove_all_children();
         this._ambientReminderLabels = [];
 
-        if (upcoming.length === 0) {
-            const emptyLabel = new St.Label({
-                text: 'Nothing scheduled',
+        this._ambientReminderHeading.visible = upcoming.length > 0;
+        this._ambientReminderList.visible = upcoming.length > 0;
+        for (const item of upcoming) {
+            const label = new St.Label({
+                text: compactText(eventText(item)),
                 style_class: 'nats-ambient-reminder',
                 x_expand: true
             });
-            this._ambientReminderList.add_child(emptyLabel);
-            this._ambientReminderLabels.push(emptyLabel);
-        } else {
-            for (const item of upcoming) {
-                const start = item.start ? new Date(item.start) : new Date(item.end);
-                const timestampText = Number.isFinite(start.getTime())
-                    ? start.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
-                    : '—';
-                const label = new St.Label({
-                    text: `${timestampText} ${item.title}`,
-                    style_class: 'nats-ambient-reminder',
-                    x_expand: true
-                });
-                this._ambientReminderList.add_child(label);
-                this._ambientReminderLabels.push(label);
-            }
+            label.clutter_text.set_single_line_mode(true);
+            label.clutter_text.set_line_wrap(false);
+            label.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
+            this._ambientReminderList.add_child(label);
+            this._ambientReminderLabels.push(label);
         }
 
-        const futureCount = this._getFutureCalendarEvents().length;
-        const moreCount = Math.max(0, futureCount - upcoming.length);
-        this._ambientMoreLabel.visible = !this._interactiveMode && moreCount > 0;
-        this._ambientMoreLabel.text = moreCount > 0 ? `+${moreCount} more` : '';
+        const moreCount = Math.max(0, remainingEvents.length - upcoming.length);
+        const moreText = moreCount > 0 ? `+${moreCount} more`
+            : calendar?.truncated && !calendarMessage ? 'More events available' : '';
+        this._ambientMoreLabel.visible = !this._interactiveMode && moreText.length > 0;
+        this._ambientMoreLabel.text = moreText;
 
         if (this._assistantNextValue) {
-            const nextEvent = this._getFutureCalendarEvents()[0];
             if (nextEvent) {
-                const nextTime = new Date(nextEvent.start ?? nextEvent.end);
-                const nextLabel = Number.isFinite(nextTime.getTime())
-                    ? nextTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
-                    : '—';
-                const nowTime = Date.now();
-                const diffMinutes = Math.max(0, Math.round((nextTime.getTime() - nowTime) / 60000));
-                this._assistantNextValue.text = `${nextLabel} ${nextEvent.title}`;
-                this._assistantNextMeta.text = diffMinutes > 0 ? `in ${diffMinutes >= 60 ? `${Math.floor(diffMinutes / 60)}h ${diffMinutes % 60}m` : `${diffMinutes}m`}` : 'now';
+                const diffMinutes = Math.max(0, Math.round((nextEvent._timestamp - nowTime) / 60000));
+                this._assistantNextValue.text = eventText(nextEvent);
+                const location = typeof nextEvent.location === 'string'
+                    ? nextEvent.location.replace(/\s+/g, ' ').trim().slice(0, 40) : '';
+                this._assistantNextMeta.text = location || (nextEvent.all_day ? 'All day'
+                    : diffMinutes > 0 ? `in ${diffMinutes >= 60 ? `${Math.floor(diffMinutes / 60)}h ${diffMinutes % 60}m` : `${diffMinutes}m`}` : 'now');
             } else {
-                this._assistantNextValue.text = 'Nothing scheduled';
+                this._assistantNextValue.text = calendarMessage ?? 'Nothing scheduled';
                 this._assistantNextMeta.text = '';
             }
+            this._assistantNextMeta.visible = this._assistantNextMeta.text.length > 0;
         }
 
         if (this._assistantNowValue) {
@@ -876,45 +959,39 @@ export default class NatsHudExtension extends Extension {
                 : typeof focus?.name === 'string' && focus.name.trim()
                     ? focus.name.trim()
                     : null;
-            this._assistantNowValue.text = title || 'No active focus';
+            this._assistantNowValue.text = activeEvent ? eventText(activeEvent) : title || 'No active focus';
         }
 
-        if (this._assistantTaskList) {
-            const tasks = Array.isArray(this._assistantHome?.tasks?.items)
-                ? this._assistantHome.tasks.items
-                : this._taskState?.tasks?.filter((task) => task && !task.completed) ?? this._loadTasks();
-            this._assistantTaskList.remove_all_children();
-            const visibleTasks = tasks.slice(0, 3);
-
-            if (visibleTasks.length === 0) {
-                const emptyLabel = new St.Label({
-                    text: this._assistantConnection === 'offline' &&
-                        !this._assistantHome && !this._assistantTasksLoaded
-                        ? 'Assistant offline'
-                        : 'No pending tasks',
-                    style_class: 'nats-ambient-reminder',
-                    x_expand: true
-                });
-                this._assistantTaskList.add_child(emptyLabel);
+        if (this._assistantTaskValue) {
+            const homeTasks = this._assistantHome?.tasks;
+            if (homeTasks) {
+                const pending = Number.isInteger(homeTasks.pending) && homeTasks.pending >= 0
+                    ? homeTasks.pending : (Array.isArray(homeTasks.items)
+                        ? homeTasks.items.filter((task) => task && !task.completed).length : 0);
+                const dueToday = Number.isInteger(homeTasks.due_today) && homeTasks.due_today >= 0
+                    ? homeTasks.due_today : 0;
+                this._assistantTaskValue.text = pending > 0 || dueToday > 0
+                    ? `${pending} pending · ${dueToday} due today` : 'No pending tasks';
+            } else if (this._assistantTasksLoaded && Array.isArray(this._taskState?.tasks)) {
+                const pending = this._taskState.tasks.filter((task) => task && !task.completed).length;
+                this._assistantTaskValue.text = pending > 0 ? `${pending} pending` : 'No pending tasks';
             } else {
-                for (const task of visibleTasks) {
-                    const taskLabel = new St.Label({
-                        text: `□ ${task.title}`,
-                        style_class: 'nats-ambient-reminder',
-                        x_expand: true
-                    });
-                    this._assistantTaskList.add_child(taskLabel);
-                }
+                this._assistantTaskValue.text = this._assistantConnection === 'offline'
+                    ? 'Assistant offline' : this._assistantConnection === 'error'
+                        ? 'Tasks unavailable' : 'Loading tasks';
             }
+        }
 
-            if (this._assistantTaskMore) {
-                const totalTasks = Number.isInteger(this._assistantHome?.tasks?.pending)
-                    ? this._assistantHome.tasks.pending
-                    : tasks.length;
-                const extraCount = Math.max(0, totalTasks - visibleTasks.length);
-                this._assistantTaskMore.visible = extraCount > 0;
-                this._assistantTaskMore.text = extraCount > 0 ? `+${extraCount} more` : '';
-            }
+        if (this._assistantEventsValue) {
+            this._assistantEventsHeading.visible = Boolean(calendar);
+            this._assistantEventsValue.visible = Boolean(calendar);
+            const day = new Date(nowTime);
+            const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+            const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).getTime();
+            const todayCount = Number.isInteger(calendar?.today_count) && calendar.today_count >= 0
+                ? calendar.today_count : events.filter((event) => event._timestamp < dayEnd &&
+                    Date.parse(event.end ?? '') > dayStart).length;
+            this._assistantEventsValue.text = calendarMessage ?? `${todayCount} today`;
         }
 
         if (this._assistantCommsValue) {
@@ -945,6 +1022,35 @@ export default class NatsHudExtension extends Extension {
         this._ambientDateHeader.add_child(this._ambientDateValue);
         body.add_child(this._ambientDateHeader);
 
+        this._ambientVerse = new St.BoxLayout({
+            vertical: true,
+            style_class: 'nats-ambient-verse',
+            x_expand: true,
+            visible: false
+        });
+        this._ambientVerseQuote = new St.Label({
+            text: '',
+            style_class: 'nats-ambient-reminder',
+            x_expand: true
+        });
+        this._ambientVerseReference = new St.Label({
+            text: '',
+            style_class: 'nats-verse-reference',
+            x_expand: true
+        });
+        this._ambientVerseHeading = new St.Label({
+            text: 'VERSE',
+            style_class: 'nats-ambient-section-title'
+        });
+        this._ambientVerse.add_child(this._ambientVerseHeading);
+        for (const label of [this._ambientVerseQuote, this._ambientVerseReference]) {
+            label.clutter_text.set_single_line_mode(true);
+            label.clutter_text.set_line_wrap(false);
+            label.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
+            this._ambientVerse.add_child(label);
+        }
+        body.add_child(this._ambientVerse);
+
         this._assistantNowHeading = new St.Label({
             text: 'NOW',
             style_class: 'nats-ambient-section-title'
@@ -972,6 +1078,32 @@ export default class NatsHudExtension extends Extension {
         body.add_child(this._assistantNextValue);
         body.add_child(this._assistantNextMeta);
 
+        this._assistantTaskHeading = new St.Label({
+            text: 'TASKS',
+            style_class: 'nats-ambient-section-title'
+        });
+        this._assistantTaskValue = new St.Label({
+            text: 'Loading tasks',
+            style_class: 'nats-ambient-reminder',
+            x_expand: true
+        });
+        body.add_child(this._assistantTaskHeading);
+        body.add_child(this._assistantTaskValue);
+
+        this._assistantEventsHeading = new St.Label({
+            text: 'EVENTS',
+            style_class: 'nats-ambient-section-title',
+            visible: false
+        });
+        this._assistantEventsValue = new St.Label({
+            text: '',
+            style_class: 'nats-ambient-reminder',
+            x_expand: true,
+            visible: false
+        });
+        body.add_child(this._assistantEventsHeading);
+        body.add_child(this._assistantEventsValue);
+
         this._ambientReminderHeading = new St.Label({
             text: 'UPCOMING',
             style_class: 'nats-ambient-section-title'
@@ -994,60 +1126,11 @@ export default class NatsHudExtension extends Extension {
             style_class: 'nats-ambient-section-title'
         });
         body.add_child(this._assistantCalendarHeading);
-        this._ambientCalendarHeading = new St.BoxLayout({
-            style_class: 'nats-ambient-calendar-heading',
-            x_expand: true
-        });
-        this._ambientCalendarTitle = new St.Label({
-            text: '',
-            style_class: 'nats-ambient-section-title',
-            x_expand: true
-        });
-        this._ambientCalendarHeading.add_child(this._ambientCalendarTitle);
-        body.add_child(this._ambientCalendarHeading);
-
-        this._ambientCalendar = new St.BoxLayout({
-            vertical: true,
-            style_class: 'nats-ambient-calendar',
-            x_expand: true
-        });
-        this._ambientWeekdays = new St.BoxLayout({
-            style_class: 'nats-ambient-calendar-row',
-            x_expand: true
-        });
-        for (const day of ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']) {
-            this._ambientWeekdays.add_child(new St.Label({
-                text: day,
-                style_class: 'nats-ambient-weekday',
-                x_expand: true,
-                x_align: Clutter.ActorAlign.CENTER
-            }));
-        }
-        this._ambientCalendar.add_child(this._ambientWeekdays);
-        this._ambientCalendarGrid = new St.BoxLayout({
-            vertical: true,
-            style_class: 'nats-ambient-calendar-grid',
-            x_expand: true
-        });
-        this._ambientCalendar.add_child(this._ambientCalendarGrid);
+        this._ambientCalendar = createCalendar({compact: true});
+        this._ambientCalendarTitle = this._ambientCalendar.monthLabel;
+        this._ambientWeekdays = this._ambientCalendar.weekdayRow;
+        this._ambientCalendarGrid = this._ambientCalendar.grid;
         body.add_child(this._ambientCalendar);
-
-        this._assistantTaskHeading = new St.Label({
-            text: 'TASKS',
-            style_class: 'nats-ambient-section-title'
-        });
-        this._assistantTaskList = new St.BoxLayout({
-            vertical: true,
-            style_class: 'nats-ambient-reminder-list',
-            x_expand: true
-        });
-        this._assistantTaskMore = new St.Label({
-            text: '',
-            style_class: 'nats-ambient-more'
-        });
-        body.add_child(this._assistantTaskHeading);
-        body.add_child(this._assistantTaskList);
-        body.add_child(this._assistantTaskMore);
 
         this._assistantCommsHeading = new St.Label({
             text: 'COMMS',
@@ -1059,6 +1142,14 @@ export default class NatsHudExtension extends Extension {
         });
         body.add_child(this._assistantCommsHeading);
         body.add_child(this._assistantCommsValue);
+
+        for (const label of [this._assistantNowValue, this._assistantNextValue,
+            this._assistantNextMeta, this._assistantTaskValue, this._assistantEventsValue]) {
+            label.clutter_text.set_single_line_mode(true);
+            label.clutter_text.set_line_wrap(false);
+            label.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
+        }
+        this._updateAmbientPersonalization();
 
         this._ambientCalendarDateKey = null;
         this._renderAmbientCalendar(new Date());
@@ -1072,73 +1163,50 @@ export default class NatsHudExtension extends Extension {
         const date = now instanceof Date
             ? now
             : new Date(now.get_year(), now.get_month() - 1, now.get_day());
-        const year = date.getFullYear();
-        const month = date.getMonth();
-        this._ambientCalendarTitle.text = GLib.DateTime
-            .new_local(year, month + 1, 1, 0, 0, 0)
-            .format('%B %Y');
-        this._ambientCalendarGrid.remove_all_children();
+        const calendar = this._assistantHome?.calendar;
+        const calendarEvents = calendar
+            ? calendar.status === 'online' && !['offline', 'error'].includes(this._assistantConnection)
+                ? [...(Array.isArray(calendar.events) ? calendar.events : []), ...(calendar.next ? [calendar.next] : [])]
+                : []
+            : (Array.isArray(this._calendarEvents) ? this._calendarEvents : []);
+        updateCalendar(this._ambientCalendar, {today: date, events: calendarEvents});
+    }
 
-        const eventDates = new Set(
-            (this._calendarEvents || [])
-                .map((event) => {
-                    const raw = event?.start ?? event?.end ?? '';
-                    const parsed = Date.parse(raw);
-                    if (!Number.isFinite(parsed))
-                        return null;
-                    const date = new Date(parsed);
-                    return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-                })
-                .filter(Boolean)
-        );
-
-        const firstDayOffset = (new Date(year, month, 1).getDay() + 6) % 7;
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const cellCount = Math.ceil((firstDayOffset + daysInMonth) / 7) * 7;
-        for (let cell = 0; cell < cellCount; cell += 7) {
-            const row = new St.BoxLayout({
-                style_class: 'nats-ambient-calendar-row',
-                x_expand: true
-            });
-            for (let column = 0; column < 7; column++) {
-                const day = cell + column - firstDayOffset + 1;
-                const isDate = day >= 1 && day <= daysInMonth;
-                const isToday = isDate && day === date.getDate();
-                const cellBox = new St.BoxLayout({
-                    vertical: true,
-                    style_class: isToday ? 'nats-ambient-calendar-day nats-ambient-today' : 'nats-ambient-calendar-day',
-                    x_expand: true,
-                    x_align: Clutter.ActorAlign.CENTER
-                });
-                if (isDate) {
-                    const label = new St.Label({
-                        text: String(day),
-                        style_class: 'nats-ambient-calendar-day-label',
-                        x_expand: true,
-                        x_align: Clutter.ActorAlign.CENTER
-                    });
-                    cellBox.add_child(label);
-                    const dateKey = `${year}-${month}-${day}`;
-                    if (eventDates.has(dateKey)) {
-                        const marker = new St.Label({
-                            text: '•',
-                            style_class: 'nats-ambient-calendar-marker',
-                            x_align: Clutter.ActorAlign.CENTER
-                        });
-                        cellBox.add_child(marker);
-                    }
-                }
-                row.add_child(cellBox);
-            }
-            this._ambientCalendarGrid.add_child(row);
+    _updateAmbientPersonalization(now = GLib.DateTime.new_now_local()) {
+        if (!this._ambientCard || !this._settings)
+            return;
+        const greeting = greetingForHour(now.get_hour(), this._settings.get_string('display-name'));
+        if (this._ambientCard.titleLabel.text !== greeting)
+            this._ambientCard.titleLabel.text = greeting;
+        if (!this._ambientVerse)
+            return;
+        if (!this._settings.get_boolean('show-daily-verse')) {
+            if (this._ambientVerse.visible)
+                this._ambientVerse.hide();
+            return;
         }
+
+        const day = now.format('%Y-%m-%d');
+        if (day !== this._ambientVerseDay) {
+            this._ambientVerseDay = day;
+            this._dailyVerse = selectDailyVerse(day, this._dailyVerses);
+            this._ambientVerseQuote.text = compactText(this._dailyVerse?.text);
+            this._ambientVerseReference.text = this._dailyVerse
+                ? `${this._dailyVerse.reference} · ${this._dailyVerse.translation}` : '';
+        }
+        // Use established monitor/work-area geometry only for optional quote
+        // detail. Enabled verse data never depends on actor allocation.
+        const {width, height} = this._getAssistantRailGeometry();
+        this._ambientVerseQuote.visible = width >= 180 && height >= 600;
+        this._ambientVerse.visible = Boolean(this._dailyVerse);
     }
 
     _updateAmbientCard() {
+        const now = GLib.DateTime.new_now_local();
         if (this._ambientDateValue) {
-            const now = GLib.DateTime.new_now_local();
             this._ambientDateValue.text = `${now.format('%A')} · ${now.format('%d %B')} · ${now.format('%H:%M')}`;
         }
+        this._updateAmbientPersonalization(now);
 
         if (!this._ambientCalendarGrid)
             return;
@@ -1159,8 +1227,6 @@ export default class NatsHudExtension extends Extension {
         this._ambientReminderLabels.forEach((label, index) => {
             label.visible = this._interactiveMode || index < 2;
         });
-        this._ambientMoreLabel.visible = !this._interactiveMode && this._calendarEvents.length > 2;
-        this._ambientMoreLabel.text = this._calendarEvents.length > 2 ? `+${this._calendarEvents.length - 2} more` : '';
         this._positionAmbientCard();
         this._ambientCard.queue_relayout();
     }
@@ -1518,6 +1584,7 @@ export default class NatsHudExtension extends Extension {
         const panel = new St.BoxLayout({
             vertical: true,
             reactive: true,
+            can_focus: true,
             track_hover: true,
             style_class: 'nats-interaction-panel',
             x_expand: true,
@@ -1576,6 +1643,7 @@ export default class NatsHudExtension extends Extension {
         this._activityInteractionRefs = null;
         this._commsInteractionRefs = null;
         this._assistantPageActor = null;
+        this._assistantTodayCalendar = null;
         this._assistantPageIndicators = null;
         this._assistantHomeShell = null;
         this._assistantPageHost = null;
@@ -1673,6 +1741,8 @@ export default class NatsHudExtension extends Extension {
 
     _setInteractionSection(section) {
         this._renderInteractionSection(section);
+        if (this._activeSection === 'control' && this._isInteractionOpen())
+            this._interactionPanel.grab_key_focus();
         log(`NATS HUD: active section ${this._activeSection.toUpperCase()}`);
     }
 
@@ -1779,6 +1849,8 @@ export default class NatsHudExtension extends Extension {
 
     _setAssistantPage(index) {
         const next = Math.max(0, Math.min(2, index));
+        if (next === 0 && this._assistantPage !== 0)
+            this._assistantSelectedDate = calendarDateKey(new Date());
         this._assistantPage = next;
         this._renderAssistantCurrentPage();
         this._updateAssistantPagerControls();
@@ -1794,12 +1866,16 @@ export default class NatsHudExtension extends Extension {
         if (!this._assistantPageHost)
             return;
 
+        const focus = global.stage.get_key_focus();
+        const focusedDate = focus?._natsCalendarDate;
+        const restoreFocus = Boolean(focus && this._assistantPageActor?.contains(focus));
         try {
             if (this._assistantPage === 1 && this._updateAssistantTasksPage())
                 return;
 
             this._assistantTasksPageRefs = null;
             this._assistantPageActor = null;
+            this._assistantTodayCalendar = null;
             this._assistantTaskListScrollView = null;
             for (const child of this._assistantPageHost.get_children()) {
                 this._assistantPageHost.remove_child(child);
@@ -1820,6 +1896,11 @@ export default class NatsHudExtension extends Extension {
                 break;
             }
             this._assistantPageHost.add_child(page);
+            const dayButton = this._assistantTodayCalendar?.dayButtons.get(focusedDate);
+            if (dayButton)
+                dayButton.grab_key_focus();
+            else if (restoreFocus)
+                this._interactionPanel?.grab_key_focus();
         } catch (error) {
             logError(error, `NATS HUD: assistant page render failed page=${this._assistantPage}`);
             this._assistantTasksPageRefs = null;
@@ -1902,8 +1983,40 @@ export default class NatsHudExtension extends Extension {
         const now = GLib.DateTime.new_now_local();
         const today = new Date();
         const section = (title) => page.add_child(this._createAssistantSectionTitle(title));
-        const futureEvents = this._getFutureCalendarEvents();
-        const nextEvent = futureEvents[0] ?? null;
+        const homeCalendar = this._assistantHome?.calendar;
+        const calendarStatus = ['offline', 'error'].includes(this._assistantConnection)
+            ? this._assistantConnection : homeCalendar?.status;
+        const calendarMessage = calendarStatus === 'not_connected'
+            ? 'Calendar not connected'
+            : calendarStatus === 'offline'
+                ? 'Calendar offline · Events unavailable'
+                : calendarStatus === 'error' ? 'Calendar unavailable' : null;
+        const prepareEvent = (event) => {
+            const start = Date.parse(event?.start ?? event?.end ?? '');
+            if (!event || event.status === 'cancelled' ||
+                typeof event.title !== 'string' || !event.title.trim() || !Number.isFinite(start))
+                return null;
+            return {...event, title: event.title.trim(), _startTime: start, _endTime: Date.parse(event.end ?? '')};
+        };
+        // Local calendar.json is only a compatibility fallback before a home
+        // calendar contract is available. Backend empty/error states win too.
+        const calendarEvents = (calendarMessage ? [] : homeCalendar
+            ? (Array.isArray(homeCalendar.events) ? homeCalendar.events : [])
+            : (Array.isArray(this._calendarEvents) ? this._calendarEvents : []))
+            .map(prepareEvent).filter(Boolean)
+            .sort((first, second) => first._startTime - second._startTime);
+        const futureEvents = calendarEvents.filter((event) => event._startTime >= today.getTime());
+        const nextEvent = calendarMessage ? null : homeCalendar
+            ? prepareEvent(homeCalendar.next) : futureEvents[0] ?? null;
+        const activeEvent = calendarEvents.find((event) => event._startTime <= today.getTime() &&
+            event._endTime > today.getTime());
+        const eventText = (event) => {
+            const date = GLib.DateTime.new_from_unix_local(Math.floor(event._startTime / 1000));
+            const time = event.all_day ? 'All day' : date.format('%H:%M');
+            const day = date.format('%Y-%m-%d') === now.format('%Y-%m-%d')
+                ? '' : `${date.format('%d %b')} · `;
+            return `${day}${time} ${event.title}`;
+        };
         const focus = this._focusState?.focus;
         const focusTitle = typeof focus?.title === 'string' && focus.title.trim()
             ? focus.title.trim()
@@ -1914,29 +2027,24 @@ export default class NatsHudExtension extends Extension {
         page.add_child(this._createAssistantSectionTitle('TODAY'));
         this._addAssistantPageRow(page, `${now.format('%A')} · ${now.format('%d %B')} · ${now.format('%H:%M')}`, true);
         section('NOW');
-        this._addAssistantPageRow(page, focusTitle);
+        this._addAssistantPageRow(page, activeEvent ? eventText(activeEvent) : focusTitle);
         section('NEXT');
         if (nextEvent) {
-            const date = new Date(nextEvent.start ?? nextEvent.end);
-            const time = Number.isFinite(date.getTime())
-                ? date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
-                : '—';
-            this._addAssistantPageRow(page, `${time} ${nextEvent.title}`, true);
+            this._addAssistantPageRow(page, eventText(nextEvent), true);
+            if (typeof nextEvent.location === 'string' && nextEvent.location.trim())
+                this._addAssistantPageRow(page, nextEvent.location.trim().slice(0, 40));
         } else {
-            this._addAssistantPageRow(page, 'Nothing scheduled');
+            this._addAssistantPageRow(page, calendarMessage ?? 'Nothing scheduled');
         }
         section('UPCOMING');
-        const upcoming = futureEvents.slice(1, 3);
+        const upcoming = futureEvents.filter((event) => event.id !== nextEvent?.id ||
+            event._startTime !== nextEvent?._startTime).slice(0, 2);
         if (upcoming.length > 0) {
-            for (const event of upcoming) {
-                const date = new Date(event.start ?? event.end);
-                const time = Number.isFinite(date.getTime())
-                    ? date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
-                    : '—';
-                this._addAssistantPageRow(page, `${time} ${event.title}`);
-            }
+            for (const event of upcoming)
+                this._addAssistantPageRow(page, eventText(event));
         } else {
-            this._addAssistantPageRow(page, nextEvent ? 'Nothing else scheduled' : 'Nothing scheduled');
+            this._addAssistantPageRow(page, calendarMessage ??
+                (nextEvent ? 'Nothing else scheduled' : 'Nothing scheduled'));
         }
 
         section('TASKS');
@@ -1966,114 +2074,42 @@ export default class NatsHudExtension extends Extension {
         }
 
         section('CALENDAR');
-        const calendar = new St.BoxLayout({
-            vertical: true,
-            style_class: 'nats-calendar',
-            x_expand: true
+        const selectedDate = this._assistantSelectedDate ?? calendarDateKey(today);
+        this._assistantTodayCalendar = createCalendar();
+        const loadedEvents = [...calendarEvents, ...(nextEvent ? [nextEvent] : [])];
+        updateCalendar(this._assistantTodayCalendar, {
+            today, events: loadedEvents, selectedDate,
+            onSelect: (key) => this._selectAssistantCalendarDate(key)
         });
-        const monthHeader = new St.BoxLayout({
-            style_class: 'nats-calendar-header',
-            x_expand: true
-        });
-        monthHeader.add_child(new St.Label({
-            text: now.format('%B %Y').toUpperCase(),
-            style_class: 'nats-calendar-month',
-            x_expand: true,
-            x_align: Clutter.ActorAlign.CENTER
-        }));
-        calendar.add_child(monthHeader);
-        const weekdayRow = new St.BoxLayout({
-            style_class: 'nats-calendar-weekdays',
-            x_expand: true
-        });
-        for (const weekday of ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']) {
-            weekdayRow.add_child(new St.Label({
-                text: weekday,
-                style_class: 'nats-calendar-weekday',
-                x_expand: true,
-                x_align: Clutter.ActorAlign.CENTER
-            }));
-        }
-        calendar.add_child(weekdayRow);
-        const calendarGrid = new St.BoxLayout({
-            vertical: true,
-            style_class: 'nats-calendar-grid',
-            x_expand: true
-        });
+        page.add_child(this._assistantTodayCalendar);
 
-        const eventDates = new Set((this._calendarEvents || []).map((event) => {
-            const parsed = Date.parse(event?.start ?? event?.end ?? '');
-            if (!Number.isFinite(parsed))
-                return null;
-            const date = new Date(parsed);
-            return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-        }).filter(Boolean));
-        const year = today.getFullYear();
-        const month = today.getMonth();
-        const firstDayOffset = (new Date(year, month, 1).getDay() + 6) % 7;
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const cellCount = Math.ceil((firstDayOffset + daysInMonth) / 7) * 7;
-        for (let cell = 0; cell < cellCount; cell += 7) {
-            const row = new St.BoxLayout({
-                style_class: 'nats-calendar-row',
-                x_expand: true
-            });
-            for (let column = 0; column < 7; column++) {
-                const day = cell + column - firstDayOffset + 1;
-                if (day < 1 || day > daysInMonth) {
-                    row.add_child(new St.BoxLayout({
-                        style_class: 'nats-calendar-day',
-                        x_expand: true
-                    }));
-                    continue;
-                }
-                const dayCell = new St.BoxLayout({
-                    vertical: true,
-                    style_class: day === today.getDate()
-                        ? 'nats-calendar-day nats-calendar-today'
-                        : 'nats-calendar-day',
-                    x_expand: true,
-                    x_align: Clutter.ActorAlign.CENTER
-                });
-                dayCell.add_child(new St.Label({
-                    text: String(day),
-                    style_class: 'nats-calendar-day-number',
-                    x_expand: true,
-                    x_align: Clutter.ActorAlign.CENTER
-                }));
-                if (eventDates.has(`${year}-${month}-${day}`)) {
-                    dayCell.add_child(new St.Label({
-                        text: '●',
-                        style_class: 'nats-calendar-event-dot',
-                        x_align: Clutter.ActorAlign.CENTER
-                    }));
-                }
-                row.add_child(dayCell);
-            }
-            calendarGrid.add_child(row);
-        }
-        calendar.add_child(calendarGrid);
-        page.add_child(calendar);
-
-        const todayEvents = (this._calendarEvents || []).filter((event) => {
-            const timestamp = Date.parse(event?.start ?? event?.end ?? '');
-            return Number.isFinite(timestamp) &&
-                new Date(timestamp).toDateString() === today.toDateString();
-        }).slice(0, 2);
-        section('TODAY\'S EVENTS');
-        if (todayEvents.length > 0) {
-            for (const event of todayEvents) {
-                const date = new Date(event.start ?? event.end);
-                const time = Number.isFinite(date.getTime())
-                    ? date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
-                    : '—';
-                this._addAssistantPageRow(page, `${time} ${event.title}`);
-            }
+        const selected = new Date(`${selectedDate}T00:00:00`);
+        const isToday = selectedDate === calendarDateKey(today);
+        section(isToday ? "TODAY'S EVENTS" : `EVENTS · ${GLib.DateTime
+            .new_local(selected.getFullYear(), selected.getMonth() + 1, selected.getDate(), 0, 0, 0)
+            .format('%d %b').toUpperCase()}`);
+        // Other dates use only the normalized backend payload, including next.
+        const selectedEvents = eventsOnCalendarDate(isToday || homeCalendar ? loadedEvents : [], selectedDate);
+        if (selectedEvents.length > 0) {
+            for (const event of selectedEvents.slice(0, 2))
+                this._addAssistantPageRow(page, eventText(event));
         } else {
-            this._addAssistantPageRow(page, 'No events today');
+            this._addAssistantPageRow(page, calendarMessage ?? (isToday ? 'No events today' : 'No loaded events'));
         }
+        if (!calendarMessage && (selectedEvents.length > 2 || (isToday && homeCalendar?.truncated) ||
+            (isToday && (homeCalendar?.today_count ?? selectedEvents.length) > 2)))
+            this._addAssistantPageRow(page, 'More events available');
 
         return page;
+    }
+
+    _selectAssistantCalendarDate(key) {
+        if (!this._isInteractionOpen() || this._activeSection !== 'control' || this._assistantPage !== 0 ||
+            !this._assistantTodayCalendar?.dayButtons.has(key))
+            return;
+        this._assistantSelectedDate = key;
+        this._renderAssistantCurrentPage();
+        this._assistantTodayCalendar?.dayButtons.get(key)?.grab_key_focus();
     }
 
     _getAssistantTasksPageState() {
@@ -3296,6 +3332,7 @@ export default class NatsHudExtension extends Extension {
             return;
 
         this._activeSection = 'control';
+        this._assistantSelectedDate = calendarDateKey(new Date());
         this._buildInteractionPanel();
         this._positionHud();
 
@@ -3315,15 +3352,35 @@ export default class NatsHudExtension extends Extension {
 
         if (this._escapeSignalId)
             global.stage.disconnect(this._escapeSignalId);
-        this._escapeSignalId = global.stage.connect('captured-event', (_stage, event) => {
-            if (event.type() !== Clutter.EventType.KEY_PRESS ||
-                event.get_key_symbol() !== Clutter.KEY_Escape)
-                return Clutter.EVENT_PROPAGATE;
+        this._escapeSignalId = global.stage.connect('captured-event', (_stage, event) =>
+            this._handleInteractionKey(event)
+        );
+        this._interactionPanel.grab_key_focus();
+        log('NATS HUD: entered interactive mode');
+    }
 
+    _handleInteractionKey(event) {
+        if (!this._isInteractionOpen() || event.type() !== Clutter.EventType.KEY_PRESS)
+            return Clutter.EVENT_PROPAGATE;
+        const key = event.get_key_symbol();
+        if (key === Clutter.KEY_Escape) {
             this._hideInteractionPanel();
             return Clutter.EVENT_STOP;
-        });
-        log('NATS HUD: entered interactive mode');
+        }
+        const focus = global.stage.get_key_focus();
+        if (this._activeSection !== 'control' || !focus || !this._interactionPanel.contains(focus) ||
+            (key !== Clutter.KEY_Left && key !== Clutter.KEY_Right))
+            return Clutter.EVENT_PROPAGATE;
+        for (let actor = focus; actor; actor = actor.get_parent()) {
+            if (actor instanceof St.Entry || (actor instanceof Clutter.Text && actor.get_editable()) ||
+                actor._natsCalendarDate)
+                return Clutter.EVENT_PROPAGATE;
+            if (actor === this._interactionPanel)
+                break;
+        }
+        this._setAssistantPage(this._assistantPage + (key === Clutter.KEY_Right ? 1 : -1));
+        this._interactionPanel.grab_key_focus();
+        return Clutter.EVENT_STOP;
     }
 
     _hideInteractionPanel() {
@@ -3544,6 +3601,9 @@ export default class NatsHudExtension extends Extension {
     }
 
     disable() {
+        this._stopAssistantHomeRefresh();
+        this._assistantHomeRequest = null;
+        this._assistantSelectedDate = null;
         Main.wm.removeKeybinding('toggle-interactive-mode');
         this._assistantClient?.dispose();
         this._assistantClient = null;
@@ -3579,6 +3639,7 @@ export default class NatsHudExtension extends Extension {
         this._assistantDot1Button = null;
         this._assistantDot2Button = null;
         this._assistantPageActor = null;
+        this._assistantTodayCalendar = null;
         this._assistantPageIndicators = null;
         this._assistantTaskListScrollView = null;
         this._assistantTasksPageRefs = null;
@@ -3666,6 +3727,13 @@ export default class NatsHudExtension extends Extension {
         this._ambientDateHeader = null;
         this._ambientDateTitle = null;
         this._ambientDateValue = null;
+        this._ambientVerse = null;
+        this._ambientVerseHeading = null;
+        this._ambientVerseQuote = null;
+        this._ambientVerseReference = null;
+        this._ambientVerseDay = null;
+        this._dailyVerse = null;
+        this._dailyVerses = [];
         this._assistantNowHeading = null;
         this._assistantNowValue = null;
         this._assistantNextHeading = null;
@@ -3680,8 +3748,9 @@ export default class NatsHudExtension extends Extension {
         this._ambientCalendarTitle = null;
         this._ambientCalendar = null;
         this._assistantTaskHeading = null;
-        this._assistantTaskList = null;
-        this._assistantTaskMore = null;
+        this._assistantTaskValue = null;
+        this._assistantEventsHeading = null;
+        this._assistantEventsValue = null;
         this._assistantCommsHeading = null;
         this._assistantCommsValue = null;
         this._ambientWeekdays = null;

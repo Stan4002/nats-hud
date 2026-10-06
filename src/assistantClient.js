@@ -58,6 +58,58 @@ function normalizeCapture(capture) {
     };
 }
 
+function normalizeCalendarEvent(event) {
+    if (!event || typeof event !== 'object' || event.status === 'cancelled' ||
+        typeof event.id !== 'string' || !event.id ||
+        typeof event.title !== 'string' || !event.title.trim())
+        return null;
+
+    const awareTimestamp = (value) => typeof value === 'string' &&
+        /(?:Z|[+-]\d{2}:\d{2})$/i.test(value) && Number.isFinite(Date.parse(value));
+    if (!awareTimestamp(event.start) || !awareTimestamp(event.end) ||
+        Date.parse(event.end) <= Date.parse(event.start))
+        return null;
+
+    return {
+        id: event.id,
+        title: event.title.trim(),
+        description: typeof event.description === 'string' ? event.description : null,
+        start: event.start,
+        end: event.end,
+        all_day: event.all_day === true,
+        location: typeof event.location === 'string' ? event.location.trim() : null,
+        source: typeof event.source === 'string' ? event.source : null,
+        source_calendar_id: typeof event.source_calendar_id === 'string' ? event.source_calendar_id : null,
+        source_event_id: typeof event.source_event_id === 'string' ? event.source_event_id : null,
+        status: typeof event.status === 'string' ? event.status : null,
+        url: typeof event.url === 'string' ? event.url : null
+    };
+}
+
+function normalizeCalendar(calendar) {
+    // Older backends omit this field; only that case permits local fallback.
+    if (calendar === undefined || calendar === null)
+        return null;
+    const empty = {status: 'error', today_count: 0, next: null, events: [], truncated: false};
+    if (typeof calendar !== 'object' ||
+        !['online', 'offline', 'error', 'not_connected'].includes(calendar.status) ||
+        !Array.isArray(calendar.events))
+        return empty;
+    if (calendar.status !== 'online')
+        return {...empty, status: calendar.status};
+
+    const events = calendar.events.map(normalizeCalendarEvent).filter(Boolean)
+        .sort((first, second) => Date.parse(first.start) - Date.parse(second.start));
+    return {
+        status: calendar.status,
+        today_count: Number.isInteger(calendar.today_count) && calendar.today_count >= 0
+            ? calendar.today_count : events.length,
+        next: normalizeCalendarEvent(calendar.next),
+        events,
+        truncated: calendar.truncated === true
+    };
+}
+
 export class AssistantClient {
     constructor() {
         this._session = new Soup.Session({
@@ -106,6 +158,7 @@ export class AssistantClient {
                     due_today: Number.isInteger(home.tasks.due_today) ? home.tasks.due_today : 0,
                     items: home.tasks.items.map(normalizeTask)
                 },
+                calendar: normalizeCalendar(home.calendar),
                 captures: home.captures && typeof home.captures === 'object'
                     ? {
                         inbox_count: Number.isInteger(home.captures.inbox_count) ? home.captures.inbox_count : 0
